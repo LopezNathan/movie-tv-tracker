@@ -12,6 +12,9 @@ A private, installable movie and television tracker. Scene keeps watch history, 
 
 ```sh
 npm install
+npm run db:migrate:local
+cp .dev.vars.example .dev.vars
+# Add your TMDB token and email to .dev.vars
 npm run dev
 ```
 

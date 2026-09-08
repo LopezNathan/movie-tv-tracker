@@ -1,0 +1,145 @@
+import {
+  type AnySQLiteColumn,
+  index,
+  integer,
+  sqliteTable,
+  text,
+  uniqueIndex,
+} from 'drizzle-orm/sqlite-core';
+
+export const users = sqliteTable('users', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
+  createdAt: text('created_at').notNull(),
+});
+
+export const media = sqliteTable(
+  'media',
+  {
+    id: text('id').primaryKey(),
+    kind: text('kind', { enum: ['movie', 'show', 'episode'] }).notNull(),
+    tmdbId: integer('tmdb_id').notNull(),
+    imdbId: text('imdb_id'),
+    tvdbId: integer('tvdb_id'),
+    title: text('title').notNull(),
+    originalTitle: text('original_title'),
+    releaseYear: integer('release_year'),
+    overview: text('overview'),
+    posterPath: text('poster_path'),
+    backdropPath: text('backdrop_path'),
+    status: text('status'),
+    runtime: integer('runtime'),
+    seriesId: text('series_id').references((): AnySQLiteColumn => media.id, {
+      onDelete: 'cascade',
+    }),
+    seasonNumber: integer('season_number'),
+    episodeNumber: integer('episode_number'),
+    airDate: text('air_date'),
+    metadataUpdatedAt: text('metadata_updated_at').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('media_kind_tmdb_unique').on(table.kind, table.tmdbId),
+    index('media_series_episode_idx').on(table.seriesId, table.seasonNumber, table.episodeNumber),
+    index('media_external_idx').on(table.imdbId, table.tvdbId),
+  ],
+);
+
+export const watchEvents = sqliteTable(
+  'watch_events',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    mediaId: text('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    watchedAt: text('watched_at').notNull(),
+    source: text('source').notNull().default('manual'),
+    sourceEventKey: text('source_event_key'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    index('watch_events_user_date_idx').on(table.userId, table.watchedAt),
+    index('watch_events_media_idx').on(table.mediaId),
+    uniqueIndex('watch_events_source_unique').on(table.userId, table.source, table.sourceEventKey),
+  ],
+);
+
+export const ratings = sqliteTable(
+  'ratings',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    mediaId: text('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    rating: integer('rating').notNull(),
+    ratedAt: text('rated_at').notNull(),
+    source: text('source').notNull().default('manual'),
+  },
+  (table) => [uniqueIndex('ratings_user_media_unique').on(table.userId, table.mediaId)],
+);
+
+export const listEntries = sqliteTable(
+  'list_entries',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    mediaId: text('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    list: text('list', { enum: ['watchlist'] })
+      .notNull()
+      .default('watchlist'),
+    addedAt: text('added_at').notNull(),
+    source: text('source').notNull().default('manual'),
+  },
+  (table) => [
+    uniqueIndex('list_entries_user_media_list_unique').on(table.userId, table.mediaId, table.list),
+  ],
+);
+
+export const importRuns = sqliteTable(
+  'import_runs',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    source: text('source').notNull(),
+    filename: text('filename'),
+    status: text('status', { enum: ['pending', 'running', 'complete', 'failed'] }).notNull(),
+    totalItems: integer('total_items').notNull().default(0),
+    processedItems: integer('processed_items').notNull().default(0),
+    importedItems: integer('imported_items').notNull().default(0),
+    skippedItems: integer('skipped_items').notNull().default(0),
+    issueCount: integer('issue_count').notNull().default(0),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+  },
+  (table) => [index('import_runs_user_idx').on(table.userId, table.createdAt)],
+);
+
+export const importIssues = sqliteTable(
+  'import_issues',
+  {
+    id: text('id').primaryKey(),
+    importRunId: text('import_run_id')
+      .notNull()
+      .references(() => importRuns.id, { onDelete: 'cascade' }),
+    fingerprint: text('fingerprint').notNull(),
+    reason: text('reason').notNull(),
+    payload: text('payload').notNull(),
+    resolvedMediaId: text('resolved_media_id').references(() => media.id),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('import_issues_run_fingerprint_unique').on(table.importRunId, table.fingerprint),
+  ],
+);
