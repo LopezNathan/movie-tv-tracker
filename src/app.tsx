@@ -1,5 +1,12 @@
 import { Clapperboard, Clock3, Download, Home, Search, Settings } from 'lucide-react';
-import { NavLink, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { DashboardPage } from './pages/dashboard';
+import { HistoryPage } from './pages/history';
+import { ImportPage } from './pages/import';
+import { MediaDetailPage } from './pages/media-detail';
+import { SearchPage } from './pages/search';
+import { SettingsPage } from './pages/settings';
+import { WatchlistPage } from './pages/watchlist';
 
 const routes = [
   { to: '/', label: 'Home', icon: Home },
@@ -9,17 +16,6 @@ const routes = [
   { to: '/import', label: 'Import', icon: Download },
   { to: '/settings', label: 'Settings', icon: Settings },
 ];
-
-function Placeholder({ title, description }: { title: string; description: string }) {
-  return (
-    <section className="page-stack">
-      <p className="eyebrow">Your private screen diary</p>
-      <h1>{title}</h1>
-      <p className="lede">{description}</p>
-      <div className="empty-state">This area is ready for the next milestone.</div>
-    </section>
-  );
-}
 
 export function App() {
   return (
@@ -32,71 +28,30 @@ export function App() {
         <span className="privacy-pill">Private library</span>
       </header>
 
+      <aside className="side-nav" aria-label="Primary navigation">
+        {routes.map(({ to, label, icon: Icon }) => (
+          <NavLink
+            key={to}
+            to={to}
+            end={to === '/'}
+            className={({ isActive }) => (isActive ? 'nav-link active' : 'nav-link')}
+          >
+            <Icon aria-hidden="true" size={20} />
+            <span>{label}</span>
+          </NavLink>
+        ))}
+      </aside>
+
       <main className="main-content">
         <Routes>
-          <Route
-            path="/"
-            element={
-              <Placeholder
-                title="Welcome back."
-                description="Pick up where you left off, remember every watch, and keep your queue tidy."
-              />
-            }
-          />
-          <Route
-            path="/search"
-            element={
-              <Placeholder
-                title="Find something."
-                description="Search movies and television without handing your viewing history to another social network."
-              />
-            }
-          />
-          <Route
-            path="/history"
-            element={
-              <Placeholder
-                title="Watch history."
-                description="Every play gets its own timestamp, including the rewatches worth remembering."
-              />
-            }
-          />
-          <Route
-            path="/watchlist"
-            element={
-              <Placeholder
-                title="Your watchlist."
-                description="A quiet shortlist for whatever deserves your time next."
-              />
-            }
-          />
-          <Route
-            path="/import"
-            element={
-              <Placeholder
-                title="Bring your history."
-                description="Import a Trakt data export without sharing your credentials."
-              />
-            }
-          />
-          <Route
-            path="/settings"
-            element={
-              <Placeholder
-                title="Settings."
-                description="Manage data, offline storage, and credits."
-              />
-            }
-          />
-          <Route
-            path="/media/:kind/:id"
-            element={
-              <Placeholder
-                title="Title details."
-                description="Episodes, ratings, progress, and watch controls will live here."
-              />
-            }
-          />
+          <Route path="/" element={<DashboardPage />} />
+          <Route path="/search" element={<SearchPage />} />
+          <Route path="/history" element={<HistoryPage />} />
+          <Route path="/watchlist" element={<WatchlistPage />} />
+          <Route path="/import" element={<ImportPage />} />
+          <Route path="/settings" element={<SettingsPage />} />
+          <Route path="/media/:kind/:id" element={<MediaDetailPage />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
