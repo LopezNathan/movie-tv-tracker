@@ -13,6 +13,7 @@ import type {
 import { importIssues, importRuns, listEntries, media, ratings, watchEvents } from './db/schema';
 import type { AppEnv } from './env';
 import { requireUser } from './lib/auth';
+import { processImportBatch } from './lib/import-service';
 import { ensureMedia } from './lib/media-service';
 import { calculateProgress } from './lib/progress';
 import { searchTmdb, TmdbError } from './lib/tmdb';
@@ -25,6 +26,28 @@ const kindParam = z.object({
   id: z.coerce.number().int().positive(),
 });
 const mediaIdParam = z.object({ mediaId: z.string().min(1) });
+const importItemSchema = z.object({
+  action: z.enum(['watch', 'rating', 'watchlist']),
+  kind: z.enum(['movie', 'show', 'episode']),
+  title: z.string().min(1).max(500),
+  year: z.number().int().optional(),
+  tmdbId: z.number().int().positive().optional(),
+  imdbId: z.string().max(32).optional(),
+  tvdbId: z.number().int().positive().optional(),
+  showTitle: z.string().max(500).optional(),
+  showYear: z.number().int().optional(),
+  showTmdbId: z.number().int().positive().optional(),
+  showImdbId: z.string().max(32).optional(),
+  showTvdbId: z.number().int().positive().optional(),
+  seasonNumber: z.number().int().min(0).optional(),
+  episodeNumber: z.number().int().min(0).optional(),
+  watchedAt: isoTimestamp.optional(),
+  ratedAt: isoTimestamp.optional(),
+  addedAt: isoTimestamp.optional(),
+  rating: z.number().int().min(1).max(10).optional(),
+  sourceEventId: z.string().max(100).optional(),
+  fingerprint: z.string().min(1).max(1000),
+});
 
 function eventRecord(row: {
   event: typeof watchEvents.$inferSelect;
@@ -473,6 +496,21 @@ app.post(
     };
     await db.insert(importRuns).values(run);
     return c.json({ run }, 201);
+  },
+);
+
+app.post(
+  '/api/imports/:id/batches',
+  zValidator('json', z.object({ items: z.array(importItemSchema).min(1).max(25) })),
+  async (c) => {
+    const result = await processImportBatch(
+      c.env,
+      c.get('user').id,
+      c.req.param('id'),
+      c.req.valid('json').items,
+    );
+    if (!result) throw new HTTPException(404, { message: 'Import run not found.' });
+    return c.json(result);
   },
 );
 

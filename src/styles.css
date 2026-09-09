@@ -36,7 +36,8 @@ a {
   text-decoration: none;
 }
 button,
-input {
+input,
+select {
   font: inherit;
 }
 button {
@@ -352,6 +353,110 @@ h3 {
   display: block;
   height: 100%;
   background: var(--accent);
+}
+
+.panel {
+  padding: 1.25rem;
+  border: 1px solid var(--line);
+  border-radius: 20px;
+  background: var(--surface);
+}
+.upload-zone {
+  position: relative;
+  display: grid;
+  place-items: center;
+  min-height: 240px;
+  padding: 2rem;
+  border: 1px dashed #4b5562;
+  border-radius: 22px;
+  background: linear-gradient(145deg, #15191e, #101216);
+  color: var(--muted);
+  text-align: center;
+  cursor: pointer;
+}
+.upload-zone strong {
+  color: #f5f4ef;
+}
+.upload-zone input {
+  position: absolute;
+  inline-size: 1px;
+  block-size: 1px;
+  opacity: 0;
+}
+.preview-panel {
+  display: grid;
+  gap: 1.2rem;
+}
+.import-counts {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.7rem;
+}
+.import-counts span {
+  display: grid;
+  gap: 0.2rem;
+  padding: 1rem;
+  border-radius: 14px;
+  background: var(--surface-raised);
+  color: var(--muted);
+}
+.import-counts strong {
+  color: var(--accent);
+  font-size: 1.4rem;
+}
+.import-progress {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.import-progress p,
+.issue-row p {
+  margin: 0.25rem 0 0;
+  color: var(--muted);
+}
+.issue-list {
+  display: grid;
+  gap: 0.7rem;
+}
+.issue-row {
+  display: flex;
+  gap: 1rem;
+}
+.issue-row > svg,
+.notice.error > svg {
+  flex: 0 0 auto;
+  color: #ffb563;
+}
+.notice {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  padding: 0.9rem 1rem;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  color: var(--muted);
+}
+.notice.error {
+  border-color: #6d3838;
+  background: #2b1a1b;
+  color: #ffb9b9;
+}
+.muted {
+  color: var(--muted);
+}
+.loading-line {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: var(--muted);
+}
+.spin {
+  animation: spin 1s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 .poster-grid {
   display: grid;

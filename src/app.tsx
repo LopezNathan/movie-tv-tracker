@@ -2,7 +2,7 @@ import { Clapperboard, Clock3, Download, Home, Search, Settings } from 'lucide-r
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { DashboardPage } from './pages/dashboard';
 import { HistoryPage } from './pages/history';
-import { ImportPage } from './pages/import';
+import { ImportPage, ImportReviewPage } from './pages/import';
 import { MediaDetailPage } from './pages/media-detail';
 import { SearchPage } from './pages/search';
 import { SettingsPage } from './pages/settings';
@@ -49,6 +49,7 @@ export function App() {
           <Route path="/history" element={<HistoryPage />} />
           <Route path="/watchlist" element={<WatchlistPage />} />
           <Route path="/import" element={<ImportPage />} />
+          <Route path="/import/:id/review" element={<ImportReviewPage />} />
           <Route path="/settings" element={<SettingsPage />} />
           <Route path="/media/:kind/:id" element={<MediaDetailPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />

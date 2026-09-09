@@ -64,3 +64,26 @@ export type MediaDetailResponse = {
 };
 
 export type ApiError = { error: string; details?: unknown };
+
+export type NormalizedImportItem = {
+  action: 'watch' | 'rating' | 'watchlist';
+  kind: 'movie' | 'show' | 'episode';
+  title: string;
+  year?: number;
+  tmdbId?: number;
+  imdbId?: string;
+  tvdbId?: number;
+  showTitle?: string;
+  showYear?: number;
+  showTmdbId?: number;
+  showImdbId?: string;
+  showTvdbId?: number;
+  seasonNumber?: number;
+  episodeNumber?: number;
+  watchedAt?: string;
+  ratedAt?: string;
+  addedAt?: string;
+  rating?: number;
+  sourceEventId?: string;
+  fingerprint: string;
+};
