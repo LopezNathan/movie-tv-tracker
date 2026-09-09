@@ -1,5 +1,6 @@
 import { Clapperboard, Clock3, Download, Home, Search, Settings } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { OfflineBanner } from './components/connectivity';
 import { DashboardPage } from './pages/dashboard';
 import { HistoryPage } from './pages/history';
 import { ImportPage, ImportReviewPage } from './pages/import';
@@ -27,6 +28,8 @@ export function App() {
         </NavLink>
         <span className="privacy-pill">Private library</span>
       </header>
+
+      <OfflineBanner />
 
       <aside className="side-nav" aria-label="Primary navigation">
         {routes.map(({ to, label, icon: Icon }) => (

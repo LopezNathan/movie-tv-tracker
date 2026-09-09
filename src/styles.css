@@ -90,6 +90,22 @@ button {
   margin: 0 auto;
   padding: 8vh 0 7rem;
 }
+.offline-banner {
+  position: sticky;
+  top: 68px;
+  z-index: 19;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.55rem 1rem;
+  background: #402426;
+  color: #ffd0d0;
+  font-size: 0.82rem;
+}
+.success-text {
+  color: var(--accent) !important;
+}
 .page-stack {
   display: grid;
   align-content: start;

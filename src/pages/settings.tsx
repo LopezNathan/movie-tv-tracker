@@ -1,6 +1,16 @@
-import { Download, ExternalLink } from 'lucide-react';
+import { Download, ExternalLink, Trash2 } from 'lucide-react';
+import { useState } from 'react';
 
 export function SettingsPage() {
+  const [cleared, setCleared] = useState(false);
+
+  async function clearOfflineData() {
+    if (!('caches' in window)) return;
+    const keys = await caches.keys();
+    await Promise.all(keys.map((key) => caches.delete(key)));
+    setCleared(true);
+  }
+
   return (
     <div className="page-stack">
       <header>
@@ -16,6 +26,20 @@ export function SettingsPage() {
         <a className="button primary" href="/api/export.json" download>
           <Download size={17} /> Download JSON
         </a>
+      </section>
+      <section className="settings-card">
+        <div>
+          <h2>Offline data</h2>
+          <p>Clear cached pages and artwork on this device. Your D1 library is not affected.</p>
+          {cleared ? (
+            <p className="success-text" role="status">
+              Offline data cleared.
+            </p>
+          ) : null}
+        </div>
+        <button className="button secondary" onClick={() => void clearOfflineData()}>
+          <Trash2 size={17} /> Clear offline data
+        </button>
       </section>
       <section className="settings-card">
         <div>

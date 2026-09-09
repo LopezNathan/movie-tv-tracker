@@ -16,13 +16,30 @@ export class ApiRequestError extends Error {
 }
 
 export async function api<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(path, {
-    ...init,
-    headers: {
-      ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init?.headers,
-    },
-  });
+  const method = init?.method?.toUpperCase() ?? 'GET';
+  if (method !== 'GET' && !navigator.onLine) {
+    throw new ApiRequestError(
+      'Reconnect before making changes. Offline writes are never queued.',
+      0,
+    );
+  }
+  let response: Response;
+  try {
+    response = await fetch(path, {
+      ...init,
+      headers: {
+        ...(init?.body ? { 'Content-Type': 'application/json' } : {}),
+        ...init?.headers,
+      },
+    });
+  } catch {
+    throw new ApiRequestError(
+      method === 'GET'
+        ? 'This page is not available offline yet.'
+        : 'The change was not saved. Reconnect and try again.',
+      0,
+    );
+  }
   if (!response.ok) {
     const body = (await response.json().catch(() => ({ error: response.statusText }))) as ApiError;
     throw new ApiRequestError(body.error || 'Request failed.', response.status);
