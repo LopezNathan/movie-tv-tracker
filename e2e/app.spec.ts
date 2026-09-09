@@ -3,8 +3,11 @@ import { expect, test } from '@playwright/test';
 test('desktop owner can navigate the primary library views', async ({ page }, testInfo) => {
   test.skip(testInfo.project.name !== 'chromium', 'Desktop-specific assertion');
   await page.goto('/');
-  await expect(page.getByRole('heading', { name: 'Start your first scene.' })).toBeVisible();
-  await page.getByRole('link', { name: 'Find a title' }).click();
+  await expect(page.getByRole('main')).toBeVisible();
+  await page
+    .getByRole('complementary', { name: 'Primary navigation' })
+    .getByRole('link', { name: 'Search' })
+    .click();
   await expect(page).toHaveURL(/\/search$/);
   await expect(page.getByRole('heading', { name: 'Find your next watch.' })).toBeVisible();
   await page.getByRole('link', { name: 'History' }).click();

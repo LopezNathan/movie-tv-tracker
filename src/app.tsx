@@ -23,10 +23,13 @@ export function App() {
     <div className="app-shell">
       <header className="topbar">
         <NavLink to="/" className="brand" aria-label="Scene home">
-          <span className="brand-mark">S</span>
-          <span>Scene</span>
+          <span className="brand-mark" aria-hidden="true">
+            S
+          </span>
+          <span className="brand-copy">
+            <strong>Scene</strong>
+          </span>
         </NavLink>
-        <span className="privacy-pill">Private library</span>
       </header>
 
       <OfflineBanner />
@@ -60,7 +63,7 @@ export function App() {
       </main>
 
       <nav className="bottom-nav" aria-label="Primary navigation">
-        {routes.slice(0, 5).map(({ to, label, icon: Icon }) => (
+        {routes.map(({ to, label, icon: Icon }) => (
           <NavLink
             key={to}
             to={to}

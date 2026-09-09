@@ -17,20 +17,18 @@ export function DashboardPage() {
 
   return (
     <div className="page-stack wide">
-      <header className="hero-copy">
-        <p className="eyebrow">Tonight, remembered</p>
-        <h1>{empty ? 'Start your first scene.' : 'Welcome back.'}</h1>
-        <p className="lede">
-          {empty
-            ? 'Search for a movie or show, then start building a watch history that stays yours.'
-            : 'Your next episodes, recent watches, and shortlist—without the noise.'}
-        </p>
-        {empty && (
-          <Link className="button primary" to="/search">
-            Find a title <ArrowRight size={18} />
-          </Link>
-        )}
-      </header>
+      {empty && (
+        <header className="hero-copy">
+          <p className="hero-statement">
+            Search for a movie or show, then start building a watch history that stays yours.
+          </p>
+          <div className="hero-footer simple">
+            <Link className="button primary" to="/search">
+              Find a title <ArrowRight size={18} />
+            </Link>
+          </div>
+        </header>
+      )}
 
       {!empty && (
         <section className="stats-grid" aria-label="Viewing totals">
