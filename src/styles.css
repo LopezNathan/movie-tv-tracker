@@ -497,51 +497,123 @@ h3 {
 
 .up-next-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(290px, 1fr));
-  gap: 0.8rem;
-}
-.up-next-card {
-  display: flex;
-  min-height: 150px;
-  align-items: center;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
   gap: 1rem;
-  padding: 1.3rem;
-  border: 1px solid var(--line);
-  background: linear-gradient(125deg, #1d1c17, #11110e);
-  transition: 180ms ease;
 }
-.up-next-card:hover {
+.up-next-card,
+.recent-card {
+  position: relative;
+  display: block;
+  min-width: 0;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  border: 1px solid var(--line-bright);
+  border-radius: 8px;
+  background: #191914;
+  isolation: isolate;
+  transition:
+    border-color 180ms ease,
+    transform 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.up-next-card:hover,
+.recent-card:hover {
   border-color: var(--accent);
-  transform: translateX(5px);
+  transform: translateY(-4px);
 }
-.up-next-card p {
+.scene-card-art {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #656154;
+}
+.scene-card-art img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  filter: saturate(0.82) contrast(1.04);
+  transition:
+    filter 350ms ease,
+    transform 450ms ease;
+}
+.up-next-card:hover .scene-card-art img,
+.recent-card:hover .scene-card-art img {
+  filter: saturate(1.02) contrast(1.06);
+  transform: scale(1.035);
+}
+.scene-card-shade {
+  position: absolute;
+  z-index: 1;
+  inset: 0;
+  background: linear-gradient(180deg, #0808070a 15%, #08080778 54%, #080807f5 100%);
+}
+.scene-card-copy {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  display: grid;
+  gap: 0.22rem;
+  padding: 1.1rem;
+}
+.scene-card-copy h3 {
+  margin: 0;
+  color: #fff;
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  line-height: 1.15;
+  text-shadow: 0 1px 8px #000;
+}
+.scene-card-copy p {
   overflow: hidden;
   margin: 0;
-  color: var(--muted);
+  color: #dedbd2;
+  font-size: 0.76rem;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.play-orb {
+.scene-card-meta {
+  overflow: hidden;
+  color: #dedbd2;
+  font-size: 0.6rem;
+  font-weight: 750;
+  letter-spacing: 0.06em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+.scene-card-action {
+  position: absolute;
+  z-index: 3;
+  top: 0.8rem;
+  right: 0.8rem;
   display: grid;
-  flex: 0 0 46px;
-  width: 46px;
-  height: 46px;
+  width: 36px;
+  height: 36px;
   place-items: center;
   border-radius: 50%;
-  background: var(--accent);
+  background: #f0d64ee8;
   color: var(--accent-ink);
-  box-shadow: 0 0 0 8px #f0d64e12;
+  box-shadow: 0 4px 18px #0008;
 }
 .progress-track {
   height: 3px;
-  margin-top: 0.85rem;
+  margin-top: 0.5rem;
   overflow: hidden;
-  background: #37362f;
+  background: #ffffff38;
 }
 .progress-track span {
   display: block;
   height: 100%;
   background: var(--accent);
+}
+.recent-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1rem;
+}
+.recent-card {
+  aspect-ratio: 3 / 2;
 }
 
 .poster-grid {
@@ -1168,6 +1240,9 @@ h3 {
   }
   .stats-grid {
     grid-template-columns: 1fr 1fr;
+  }
+  .recent-grid {
+    grid-template-columns: 1fr;
   }
   .stat-card:last-child {
     grid-column: 1 / -1;

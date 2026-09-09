@@ -49,7 +49,7 @@ export type SearchResult = {
 
 export type DashboardResponse = {
   upNext: Array<{ show: MediaRecord; progress: ShowProgress }>;
-  recent: WatchEventRecord[];
+  recent: Array<WatchEventRecord & { show?: MediaRecord }>;
   watchlist: MediaRecord[];
   stats: { watchedMovies: number; watchedEpisodes: number; watchEvents: number };
 };

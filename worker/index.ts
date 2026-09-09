@@ -135,10 +135,14 @@ app.get('/api/dashboard', async (c) => {
     .sort((a, b) =>
       (a.progress.nextEpisode?.airDate ?? '').localeCompare(b.progress.nextEpisode?.airDate ?? ''),
     );
+  const showsById = new Map(showRows.map((show) => [show.id, show as MediaRecord]));
 
   const payload: DashboardResponse = {
     upNext,
-    recent: recentRows.map(eventRecord),
+    recent: recentRows.map((row) => ({
+      ...eventRecord(row),
+      show: row.item.seriesId ? showsById.get(row.item.seriesId) : undefined,
+    })),
     watchlist: watchlistRows.map((row) => row.item as MediaRecord),
     stats: {
       watchedMovies: new Set(
