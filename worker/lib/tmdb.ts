@@ -47,6 +47,18 @@ export type TmdbSeason = {
   }>;
 };
 
+export type TmdbFindResult = {
+  movie_results: TmdbSearchItem[];
+  tv_results: TmdbSearchItem[];
+  tv_episode_results: Array<{
+    id: number;
+    name: string;
+    show_id: number;
+    season_number: number;
+    episode_number: number;
+  }>;
+};
+
 async function request<T>(
   env: Bindings,
   path: string,
@@ -103,4 +115,10 @@ export function getTmdbDetails(env: Bindings, kind: 'movie' | 'show', tmdbId: nu
 
 export function getTmdbSeason(env: Bindings, tmdbId: number, seasonNumber: number) {
   return request<TmdbSeason>(env, `/tv/${tmdbId}/season/${seasonNumber}`);
+}
+
+export function findTmdb(env: Bindings, externalId: string, source: 'imdb_id' | 'tvdb_id') {
+  return request<TmdbFindResult>(env, `/find/${encodeURIComponent(externalId)}`, {
+    external_source: source,
+  });
 }

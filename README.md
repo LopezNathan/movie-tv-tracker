@@ -2,6 +2,8 @@
 
 A private, installable movie and television tracker. Scene keeps watch history, ratings, watchlists, and episode progress in a Cloudflare D1 database and uses TMDB for catalog metadata.
 
+![Scene dashboard](public/scene-dashboard.png)
+
 ## Requirements
 
 - Node.js 22 or newer

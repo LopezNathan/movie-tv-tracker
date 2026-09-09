@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Film, Play, Tv, Waves } from 'lucide-react';
+import { ArrowRight, Film, ImageOff, Play, Tv, Waves } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorState, LoadingState } from '../components/async-state';
 import { MediaCard } from '../components/media-card';
+import { WatchHistoryCard } from '../components/watch-history-card';
 import { queries } from '../lib/api';
-import { episodeCode, formatDate } from '../lib/format';
+import { episodeCode, imageUrl } from '../lib/format';
 
 export function DashboardPage() {
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: queries.dashboard });
@@ -61,22 +62,36 @@ export function DashboardPage() {
         </div>
         {data.upNext.length ? (
           <div className="up-next-grid">
-            {data.upNext.map(({ show, progress }) => (
-              <Link to={`/media/show/${show.tmdbId}`} className="up-next-card" key={show.id}>
-                <div className="play-orb">
-                  <Play fill="currentColor" size={18} />
-                </div>
-                <div className="grow">
-                  <span className="meta">{episodeCode(progress.nextEpisode!)}</span>
-                  <h3>{show.title}</h3>
-                  <p>{progress.nextEpisode!.title}</p>
-                  <div className="progress-track">
-                    <span style={{ width: `${progress.percentage}%` }} />
+            {data.upNext.map(({ show, progress }) => {
+              const poster = imageUrl(show.posterPath);
+              const nextEpisode = progress.nextEpisode!;
+
+              return (
+                <Link to={`/media/show/${show.tmdbId}`} className="up-next-card" key={show.id}>
+                  <div className="poster-wrap up-next-poster">
+                    {poster ? (
+                      <img src={poster} alt="" loading="lazy" />
+                    ) : (
+                      <ImageOff aria-hidden="true" />
+                    )}
+                    <span className="kind-chip">{episodeCode(nextEpisode)}</span>
+                    <span className="play-orb" aria-hidden="true">
+                      <Play fill="currentColor" size={18} />
+                    </span>
                   </div>
-                </div>
-                <strong>{progress.percentage}%</strong>
-              </Link>
-            ))}
+                  <div className="up-next-copy">
+                    <h3>{show.title}</h3>
+                    <p>{nextEpisode.title}</p>
+                    <div className="up-next-progress">
+                      <span>{progress.percentage}% watched</span>
+                    </div>
+                    <div className="progress-track" aria-hidden="true">
+                      <span style={{ width: `${progress.percentage}%` }} />
+                    </div>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         ) : (
           <EmptyState title="Nothing queued">
@@ -96,17 +111,9 @@ export function DashboardPage() {
           </Link>
         </div>
         {data.recent.length ? (
-          <div className="event-list">
+          <div className="poster-grid">
             {data.recent.slice(0, 6).map((event) => (
-              <div className="event-row" key={event.id}>
-                <span className="event-kind">
-                  {event.media.kind === 'episode' ? episodeCode(event.media) : event.media.kind}
-                </span>
-                <div>
-                  <strong>{event.media.title}</strong>
-                  <span>{formatDate(event.watchedAt)}</span>
-                </div>
-              </div>
+              <WatchHistoryCard key={event.id} event={event} />
             ))}
           </div>
         ) : (

@@ -1,8 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { RotateCcw } from 'lucide-react';
 import { EmptyState, ErrorState, LoadingState } from '../components/async-state';
+import { WatchHistoryCard } from '../components/watch-history-card';
 import { api, queries } from '../lib/api';
-import { episodeCode, formatDate } from '../lib/format';
 
 export function HistoryPage() {
   const client = useQueryClient();
@@ -23,26 +22,14 @@ export function HistoryPage() {
       </header>
       {undo.error && <ErrorState error={undo.error} />}
       {history.data!.items.length ? (
-        <div className="event-list history-list">
+        <div className="poster-grid">
           {history.data!.items.map((event) => (
-            <article className="event-row" key={event.id}>
-              <span className="event-kind">
-                {event.media.kind === 'episode' ? episodeCode(event.media) : event.media.kind}
-              </span>
-              <div className="grow">
-                <strong>{event.media.title}</strong>
-                <span>{formatDate(event.watchedAt)}</span>
-              </div>
-              <button
-                className="icon-button"
-                aria-label={`Undo watch of ${event.media.title}`}
-                title="Undo this watch"
-                onClick={() => undo.mutate(event.id)}
-                disabled={undo.isPending}
-              >
-                <RotateCcw size={17} />
-              </button>
-            </article>
+            <WatchHistoryCard
+              key={event.id}
+              event={event}
+              onUndo={(id) => undo.mutate(id)}
+              undoDisabled={undo.isPending}
+            />
           ))}
         </div>
       ) : (
