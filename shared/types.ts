@@ -27,6 +27,11 @@ export type WatchEventRecord = {
   media: MediaRecord;
 };
 
+export type WatchEventWithShow = WatchEventRecord & {
+  show?: MediaRecord;
+  seasonPosterPath?: string | null;
+};
+
 export type ShowProgress = {
   showId: string;
   watched: number;
@@ -49,7 +54,7 @@ export type SearchResult = {
 
 export type DashboardResponse = {
   upNext: Array<{ show: MediaRecord; progress: ShowProgress }>;
-  recent: Array<WatchEventRecord & { show?: MediaRecord }>;
+  recent: WatchEventWithShow[];
   watchlist: MediaRecord[];
   stats: { watchedMovies: number; watchedEpisodes: number; watchEvents: number };
 };

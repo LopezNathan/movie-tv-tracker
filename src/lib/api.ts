@@ -3,7 +3,7 @@ import type {
   DashboardResponse,
   MediaDetailResponse,
   SearchResult,
-  WatchEventRecord,
+  WatchEventWithShow,
 } from '../../shared/types';
 
 export class ApiRequestError extends Error {
@@ -55,7 +55,7 @@ export const queries = {
       `/api/search?q=${encodeURIComponent(query)}`,
     ),
   media: (kind: string, id: string) => api<MediaDetailResponse>(`/api/media/${kind}/${id}`),
-  history: () => api<{ items: WatchEventRecord[]; nextCursor: string | null }>('/api/history'),
+  history: () => api<{ items: WatchEventWithShow[]; nextCursor: string | null }>('/api/history'),
   watchlist: () =>
     api<{
       items: Array<{ item: MediaDetailResponse['media']; addedAt: string }>;

@@ -3,16 +3,9 @@ import { ArrowRight, ImageOff, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorState, LoadingState } from '../components/async-state';
 import { MediaCard } from '../components/media-card';
+import { WatchHistoryCard } from '../components/watch-history-card';
 import { queries } from '../lib/api';
-import { episodeCode, formatDate, imageUrl } from '../lib/format';
-
-function artwork(
-  item: { backdropPath: string | null; posterPath: string | null },
-  fallback?: { backdropPath: string | null; posterPath: string | null },
-) {
-  const backdrop = fallback?.backdropPath ?? item.backdropPath;
-  return backdrop ? imageUrl(backdrop, true) : imageUrl(fallback?.posterPath ?? item.posterPath);
-}
+import { episodeCode, imageUrl } from '../lib/format';
 
 export function DashboardPage() {
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: queries.dashboard });
@@ -46,28 +39,30 @@ export function DashboardPage() {
           </div>
         </div>
         {data.upNext.length ? (
-          <div className="up-next-grid">
+          <div className="poster-grid up-next-grid">
             {data.upNext.map(({ show, progress }) => {
-              const image = artwork(show);
+              const image = imageUrl(show.posterPath);
               return (
-                <Link to={`/media/show/${show.tmdbId}`} className="up-next-card" key={show.id}>
-                  <div className="scene-card-art">
+                <Link
+                  to={`/media/show/${show.tmdbId}`}
+                  className="media-card up-next-card"
+                  key={show.id}
+                >
+                  <div className="poster-wrap">
                     {image ? (
                       <img src={image} alt="" loading="lazy" />
                     ) : (
                       <ImageOff aria-hidden="true" />
                     )}
-                  </div>
-                  <div className="scene-card-shade" />
-                  <span className="scene-card-action" aria-hidden="true">
-                    <Play fill="currentColor" size={16} />
-                  </span>
-                  <div className="scene-card-copy">
-                    <span className="scene-card-meta">
-                      {episodeCode(progress.nextEpisode!)} · {progress.percentage}% watched
+                    <span className="kind-chip">{episodeCode(progress.nextEpisode!)}</span>
+                    <span className="poster-card-action" aria-hidden="true">
+                      <Play fill="currentColor" size={16} />
                     </span>
-                    <h3>{show.title}</h3>
+                  </div>
+                  <div className="media-card-copy up-next-card-copy">
+                    <strong>{show.title}</strong>
                     <p>{progress.nextEpisode!.title}</p>
+                    <span>{progress.percentage}% watched</span>
                     <div className="progress-track">
                       <span style={{ width: `${progress.percentage}%` }} />
                     </div>
@@ -94,38 +89,10 @@ export function DashboardPage() {
           </Link>
         </div>
         {data.recent.length ? (
-          <div className="recent-grid">
-            {data.recent.slice(0, 6).map((event) => {
-              const isEpisode = event.media.kind === 'episode';
-              const title = isEpisode && event.show ? event.show.title : event.media.title;
-              const target =
-                isEpisode && event.show
-                  ? `/media/show/${event.show.tmdbId}`
-                  : isEpisode
-                    ? '/history'
-                    : `/media/${event.media.kind}/${event.media.tmdbId}`;
-              const image = artwork(event.media, event.show);
-              return (
-                <Link className="recent-card" to={target} key={event.id}>
-                  <div className="scene-card-art">
-                    {image ? (
-                      <img src={image} alt="" loading="lazy" />
-                    ) : (
-                      <ImageOff aria-hidden="true" />
-                    )}
-                  </div>
-                  <div className="scene-card-shade" />
-                  <div className="scene-card-copy">
-                    <span className="scene-card-meta">
-                      {isEpisode ? episodeCode(event.media) : 'Movie'} ·{' '}
-                      {formatDate(event.watchedAt)}
-                    </span>
-                    <h3>{title}</h3>
-                    {isEpisode && <p>{event.media.title}</p>}
-                  </div>
-                </Link>
-              );
-            })}
+          <div className="poster-grid recent-grid">
+            {data.recent.slice(0, 6).map((event) => (
+              <WatchHistoryCard key={event.id} event={event} />
+            ))}
           </div>
         ) : (
           <EmptyState title="No history yet">

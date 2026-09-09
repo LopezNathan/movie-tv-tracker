@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, desc, eq, lt, or } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -24,9 +24,10 @@ import { requireUser } from './lib/auth';
 import { processImportBatch } from './lib/import-service';
 import { ensureMedia } from './lib/media-service';
 import { calculateProgress } from './lib/progress';
-import { searchTmdb, TmdbError } from './lib/tmdb';
+import { getTmdbSeason, searchTmdb, TmdbError } from './lib/tmdb';
 
 const app = new Hono<AppEnv>();
+const seasonPosterCache = new Map<string, string | null>();
 
 const isoTimestamp = z.string().datetime({ offset: true });
 const kindParam = z.object({
@@ -266,7 +267,47 @@ app.get(
       .orderBy(desc(watchEvents.watchedAt), desc(watchEvents.id))
       .limit(limit + 1);
     const hasMore = rows.length > limit;
-    const page = rows.slice(0, limit).map(eventRecord);
+    const pageRows = rows.slice(0, limit);
+    const seriesIds = [
+      ...new Set(pageRows.flatMap((row) => (row.item.seriesId ? [row.item.seriesId] : []))),
+    ];
+    const showRows = seriesIds.length
+      ? await db.select().from(media).where(inArray(media.id, seriesIds))
+      : [];
+    const showsById = new Map(showRows.map((show) => [show.id, show as MediaRecord]));
+    const seasons = new Map<string, { show: MediaRecord; seasonNumber: number }>();
+    for (const row of pageRows) {
+      const show = row.item.seriesId ? showsById.get(row.item.seriesId) : undefined;
+      if (show && row.item.seasonNumber !== null) {
+        seasons.set(`${show.id}:${row.item.seasonNumber}`, {
+          show,
+          seasonNumber: row.item.seasonNumber,
+        });
+      }
+    }
+    const seasonPosters = new Map(
+      await Promise.all(
+        [...seasons.entries()].map(async ([key, { show, seasonNumber }]) => {
+          if (seasonPosterCache.has(key)) return [key, seasonPosterCache.get(key)] as const;
+          try {
+            const season = await getTmdbSeason(c.env, show.tmdbId, seasonNumber);
+            const posterPath = season.poster_path ?? null;
+            seasonPosterCache.set(key, posterPath);
+            return [key, posterPath] as const;
+          } catch {
+            return [key, null] as const;
+          }
+        }),
+      ),
+    );
+    const page = pageRows.map((row) => ({
+      ...eventRecord(row),
+      show: row.item.seriesId ? showsById.get(row.item.seriesId) : undefined,
+      seasonPosterPath:
+        row.item.seriesId && row.item.seasonNumber !== null
+          ? (seasonPosters.get(`${row.item.seriesId}:${row.item.seasonNumber}`) ?? null)
+          : undefined,
+    }));
     return c.json({ items: page, nextCursor: hasMore ? page.at(-1)?.watchedAt : null });
   },
 );

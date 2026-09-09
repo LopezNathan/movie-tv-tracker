@@ -35,6 +35,7 @@ export type TmdbDetails = TmdbSearchItem & {
 };
 
 export type TmdbSeason = {
+  poster_path?: string;
   episodes: Array<{
     id: number;
     name: string;
