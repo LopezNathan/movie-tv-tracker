@@ -57,6 +57,7 @@
     "eslint-plugin-react-refresh": "latest",
     "globals": "latest",
     "jsdom": "latest",
+    "miniflare": "^4.20260730.0",
     "prettier": "latest",
     "tailwindcss": "latest",
     "typescript": "latest",

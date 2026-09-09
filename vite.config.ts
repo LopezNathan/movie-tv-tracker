@@ -10,7 +10,7 @@ export default defineConfig({
     tailwindcss(),
     VitePWA({
       registerType: 'prompt',
-      includeAssets: ['scene-icon.svg', 'pwa-192x192.png', 'pwa-512x512.png'],
+      includeAssets: ['pwa-192x192.png', 'pwa-512x512.png'],
       manifest: {
         name: 'Scene — Private Movie & TV Tracker',
         short_name: 'Scene',
@@ -45,7 +45,7 @@ export default defineConfig({
       workbox: {
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
-        globPatterns: ['**/*.{js,css,html,svg}'],
+        globPatterns: ['**/*.{js,css,html}'],
         runtimeCaching: [
           {
             urlPattern: ({ url, request }) =>

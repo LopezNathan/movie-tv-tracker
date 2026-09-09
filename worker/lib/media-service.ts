@@ -157,7 +157,7 @@ export async function ensureMedia(
     .get();
   if (!saved) throw new Error('Media metadata could not be saved.');
 
-  if (kind === 'show' && (force || !existing)) {
+  if (kind === 'show') {
     await hydrateEpisodes(env, saved, detail.number_of_seasons ?? 0);
   }
   return saved as MediaRecord;

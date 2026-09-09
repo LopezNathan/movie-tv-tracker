@@ -11,10 +11,10 @@ A private, installable movie and television tracker. Scene keeps watch history, 
 ## Local development
 
 ```sh
-npm install
-npm run db:migrate:local
+npm ci
 cp .dev.vars.example .dev.vars
 # Add your TMDB token and email to .dev.vars
+npm run db:migrate:local
 npm run dev
 ```
 
@@ -30,6 +30,16 @@ npm run test         # unit and integration tests
 npm run test:e2e     # Playwright browser tests
 npm run check        # all non-browser verification
 ```
+
+For the complete verification suite on a fresh clone:
+
+```sh
+npx playwright install chromium
+npm run check
+npm run test:e2e
+```
+
+Vitest runs unit tests plus API integration tests against isolated Miniflare D1 databases. Playwright starts the local Worker and covers the primary desktop and mobile navigation journeys.
 
 ## Production
 

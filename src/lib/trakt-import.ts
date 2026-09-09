@@ -20,6 +20,11 @@ function asText(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function asIdentifier(value: unknown) {
+  if (typeof value === 'number' && Number.isFinite(value)) return String(value);
+  return asText(value);
+}
+
 function asNumber(value: unknown) {
   const parsed = typeof value === 'number' ? value : Number(value);
   return Number.isFinite(parsed) ? parsed : undefined;
@@ -87,7 +92,7 @@ function normalize(filename: string, row: UnknownRecord): NormalizedImportItem |
   if (action === 'rating' && (!rating || rating < 1 || rating > 10)) return null;
   if (action === 'watch' && !watchedAt) return null;
 
-  const sourceEventId = asText(row.id ?? row.history_id ?? row.event_id);
+  const sourceEventId = asIdentifier(row.id ?? row.history_id ?? row.event_id);
   const identity =
     ids.tmdbId ?? ids.imdbId ?? ids.tvdbId ?? `${title}:${asNumber(value.item.year) ?? ''}`;
   const fingerprint = [

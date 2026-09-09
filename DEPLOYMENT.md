@@ -51,7 +51,9 @@ Before adding personal data, open Cloudflare Zero Trust and create a self-hosted
 1. Add a policy whose action is **Allow**.
 2. Include only the email address that should own this library.
 3. Set the session duration you prefer and save the application.
-4. Open the workers.dev address in a private browser window and confirm that Access challenges before Scene loads.
+4. Copy the application **AUD tag** into `CF_ACCESS_AUD` in `wrangler.jsonc`.
+5. Replace `CF_ACCESS_TEAM_DOMAIN` with your Zero Trust team domain (for example, `your-team.cloudflareaccess.com`).
+6. Deploy again, then open the workers.dev address in a private browser window and confirm that Access challenges before Scene loads.
 
 The Worker validates Cloudflare's signed `Cf-Access-Jwt-Assertion` and uses the stable Access subject as `user_id`. `DEV_USER_EMAIL` is accepted only when `ENVIRONMENT=development`; never set that variable in production.
 

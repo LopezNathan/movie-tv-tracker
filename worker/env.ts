@@ -8,6 +8,8 @@ export type Bindings = {
   ENVIRONMENT: 'development' | 'production' | 'test';
   DEV_USER_EMAIL?: string;
   TMDB_API_TOKEN?: string;
+  CF_ACCESS_TEAM_DOMAIN?: string;
+  CF_ACCESS_AUD?: string;
 };
 
 export type Variables = {
