@@ -1,14 +1,16 @@
 import { readFile } from 'node:fs/promises';
-import { Miniflare } from 'miniflare';
+import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import type { Bindings } from '../worker/env';
 
 export async function createTestDatabase() {
-  const miniflare = new Miniflare({
-    modules: true,
-    script: 'export default { fetch() { return new Response("test") } }',
-    compatibilityDate: '2026-07-30',
-    d1Databases: { DB: `scene-test-${crypto.randomUUID()}` },
-  });
+  const miniflare = new Miniflare(
+    convertV4MiniflareOptions({
+      modules: true,
+      script: 'export default { fetch() { return new Response("test") } }',
+      compatibilityDate: '2026-09-08',
+      d1Databases: { DB: `scene-test-${crypto.randomUUID()}` },
+    }),
+  );
   const database = await miniflare.getD1Database('DB');
   const migration = await readFile(
     new URL('../migrations/0000_initial.sql', import.meta.url),
