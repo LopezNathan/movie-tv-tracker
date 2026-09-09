@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import { Clapperboard, Clock3, Download, Home, Search, Settings } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { OfflineBanner } from './components/connectivity';
@@ -8,6 +9,7 @@ import { MediaDetailPage } from './pages/media-detail';
 import { SearchPage } from './pages/search';
 import { SettingsPage } from './pages/settings';
 import { WatchlistPage } from './pages/watchlist';
+import { queries } from './lib/api';
 
 const routes = [
   { to: '/', label: 'Home', icon: Home },
@@ -19,6 +21,9 @@ const routes = [
 ];
 
 export function App() {
+  const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: queries.dashboard });
+  const stats = dashboard.data?.stats;
+
   return (
     <div className="app-shell">
       <header className="topbar">
@@ -30,6 +35,22 @@ export function App() {
             <strong>Scene</strong>
           </span>
         </NavLink>
+        {stats && (
+          <div className="header-stats" aria-label="Viewing totals">
+            <span className="header-stat">
+              <strong>{stats.watchedMovies}</strong>
+              <small>Movies</small>
+            </span>
+            <span className="header-stat">
+              <strong>{stats.watchedEpisodes}</strong>
+              <small>Episodes</small>
+            </span>
+            <span className="header-stat accent">
+              <strong>{stats.watchEvents}</strong>
+              <small>Plays</small>
+            </span>
+          </div>
+        )}
       </header>
 
       <OfflineBanner />

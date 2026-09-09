@@ -1,4 +1,4 @@
-import { readFile } from 'node:fs/promises';
+import { readdir, readFile } from 'node:fs/promises';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import type { Bindings } from '../worker/env';
 
@@ -12,15 +12,18 @@ export async function createTestDatabase() {
     }),
   );
   const database = await miniflare.getD1Database('DB');
-  const migration = await readFile(
-    new URL('../migrations/0000_initial.sql', import.meta.url),
-    'utf8',
-  );
-  for (const statement of migration
-    .split(';')
-    .map((value) => value.trim())
-    .filter(Boolean)) {
-    await database.prepare(statement).run();
+  const migrationsUrl = new URL('../migrations/', import.meta.url);
+  const migrationFiles = (await readdir(migrationsUrl))
+    .filter((file) => file.endsWith('.sql'))
+    .sort();
+  for (const file of migrationFiles) {
+    const migration = await readFile(new URL(file, migrationsUrl), 'utf8');
+    for (const statement of migration
+      .split(';')
+      .map((value) => value.trim())
+      .filter(Boolean)) {
+      await database.prepare(statement).run();
+    }
   }
   const env: Bindings = {
     DB: database,

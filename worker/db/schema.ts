@@ -105,6 +105,21 @@ export const listEntries = sqliteTable(
   ],
 );
 
+export const upNextExclusions = sqliteTable(
+  'up_next_exclusions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    showId: text('show_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    hiddenAt: text('hidden_at').notNull(),
+  },
+  (table) => [uniqueIndex('up_next_exclusions_user_show_unique').on(table.userId, table.showId)],
+);
+
 export const importRuns = sqliteTable(
   'import_runs',
   {

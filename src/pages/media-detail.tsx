@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, BookmarkCheck, Check, RefreshCw, Star } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Check, Eye, EyeOff, RefreshCw, Star } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import type { MediaRecord } from '../../shared/types';
 import { ErrorState, LoadingState } from '../components/async-state';
@@ -52,6 +52,11 @@ export function MediaDetailPage() {
       api<{ created: number }>('/api/bulk-watch', json('POST', body)),
     onSuccess: refreshAll,
   });
+  const upNextVisibility = useMutation({
+    mutationFn: ({ mediaId, hidden }: { mediaId: string; hidden: boolean }) =>
+      api(`/api/up-next/${mediaId}`, json('PUT', { hidden })),
+    onSuccess: refreshAll,
+  });
 
   if (detail.isLoading) return <LoadingState label="Opening the title and episode guide…" />;
   if (detail.error) return <ErrorState error={detail.error} retry={() => detail.refetch()} />;
@@ -63,7 +68,13 @@ export function MediaDetailPage() {
   const bySeason = groupEpisodes(data.episodes);
   const latestEvent = (mediaId: string) =>
     data.watchEvents.find((event) => event.mediaId === mediaId);
-  const actionError = watch.error ?? undo.error ?? watchlist.error ?? rate.error ?? bulk.error;
+  const actionError =
+    watch.error ??
+    undo.error ??
+    watchlist.error ??
+    rate.error ??
+    bulk.error ??
+    upNextVisibility.error;
 
   return (
     <div className="detail-page">
@@ -116,6 +127,22 @@ export function MediaDetailPage() {
             >
               <RefreshCw size={17} /> Refresh
             </button>
+            {data.media.kind === 'show' && (
+              <button
+                className="button ghost"
+                onClick={() =>
+                  upNextVisibility.mutate({
+                    mediaId: data.media.id,
+                    hidden: !data.hiddenFromUpNext,
+                  })
+                }
+                disabled={upNextVisibility.isPending}
+                aria-pressed={data.hiddenFromUpNext}
+              >
+                {data.hiddenFromUpNext ? <Eye size={17} /> : <EyeOff size={17} />}
+                {data.hiddenFromUpNext ? 'Show in Up Next' : 'Hide from Up Next'}
+              </button>
+            )}
           </div>
         </div>
       </section>
@@ -180,7 +207,7 @@ export function MediaDetailPage() {
               (season) => season.seasonNumber === seasonNumber,
             );
             return (
-              <details className="season-panel" key={seasonNumber} open={seasonNumber === 1}>
+              <details className="season-panel" key={seasonNumber}>
                 <summary>
                   <div>
                     <strong>Season {seasonNumber}</strong>

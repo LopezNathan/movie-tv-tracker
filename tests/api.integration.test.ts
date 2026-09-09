@@ -118,6 +118,87 @@ describe('tracker API with local D1', () => {
     expect(events.results.map((row) => row.media_id).sort()).toEqual(['ep-1', 'ep-2']);
   });
 
+  it('persists per-user Up Next visibility without removing progress', async () => {
+    await request('/api/health');
+    await seedMedia(harness.database, {
+      id: 'show-1',
+      kind: 'show',
+      tmdbId: 10,
+      title: 'Show',
+      status: 'Ended',
+    });
+    await seedMedia(harness.database, {
+      id: 'ep-1',
+      kind: 'episode',
+      tmdbId: 11,
+      title: 'One',
+      seriesId: 'show-1',
+      seasonNumber: 1,
+      episodeNumber: 1,
+      airDate: '2020-01-01',
+    });
+    await seedMedia(harness.database, {
+      id: 'ep-2',
+      kind: 'episode',
+      tmdbId: 12,
+      title: 'Two',
+      seriesId: 'show-1',
+      seasonNumber: 1,
+      episodeNumber: 2,
+      airDate: '2020-01-02',
+    });
+    await request('/api/watch-events', body('POST', { mediaId: 'ep-1' }));
+
+    const visible = await (
+      await request('/api/dashboard')
+    ).json<{ upNext: Array<{ show: { id: string } }> }>();
+    expect(visible.upNext.map(({ show }) => show.id)).toContain('show-1');
+
+    expect((await request('/api/up-next/show-1', body('PUT', { hidden: true }))).status).toBe(200);
+    const hidden = await (
+      await request('/api/dashboard')
+    ).json<{ upNext: Array<{ show: { id: string } }> }>();
+    expect(hidden.upNext.map(({ show }) => show.id)).not.toContain('show-1');
+
+    const detail = await (
+      await request('/api/media/show/10')
+    ).json<{ hiddenFromUpNext: boolean; progress: { watched: number } }>();
+    expect(detail).toMatchObject({ hiddenFromUpNext: true, progress: { watched: 1 } });
+
+    await request('/api/up-next/show-1', body('PUT', { hidden: false }));
+    const restored = await (
+      await request('/api/dashboard')
+    ).json<{ upNext: Array<{ show: { id: string } }> }>();
+    expect(restored.upNext.map(({ show }) => show.id)).toContain('show-1');
+  });
+
+  it('opens a long-running show without exceeding D1 query limits', async () => {
+    await request('/api/health');
+    await seedMedia(harness.database, {
+      id: 'show-1',
+      kind: 'show',
+      tmdbId: 10,
+      title: 'Long-running show',
+      status: 'Ended',
+    });
+    for (let episodeNumber = 1; episodeNumber <= 110; episodeNumber += 1) {
+      await seedMedia(harness.database, {
+        id: `ep-${episodeNumber}`,
+        kind: 'episode',
+        tmdbId: 100 + episodeNumber,
+        title: `Episode ${episodeNumber}`,
+        seriesId: 'show-1',
+        seasonNumber: 1,
+        episodeNumber,
+        airDate: '2020-01-01',
+      });
+    }
+
+    const response = await request('/api/media/show/10');
+    expect(response.status).toBe(200);
+    expect((await response.json<{ episodes: unknown[] }>()).episodes).toHaveLength(110);
+  });
+
   it('deduplicates the same imported watch event', async () => {
     await request('/api/health');
     await seedMedia(harness.database, { id: 'movie-1', kind: 'movie', tmdbId: 1, title: 'Film' });

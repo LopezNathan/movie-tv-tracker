@@ -60,6 +60,7 @@ export type MediaDetailResponse = {
   watchEvents: WatchEventRecord[];
   rating: number | null;
   inWatchlist: boolean;
+  hiddenFromUpNext: boolean;
   progress: ShowProgress | null;
 };
 

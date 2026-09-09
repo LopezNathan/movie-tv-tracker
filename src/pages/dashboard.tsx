@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { ArrowRight, Film, ImageOff, Play, Tv, Waves } from 'lucide-react';
+import { ArrowRight, ImageOff, Play } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorState, LoadingState } from '../components/async-state';
 import { MediaCard } from '../components/media-card';
@@ -36,26 +36,6 @@ export function DashboardPage() {
             </Link>
           </div>
         </header>
-      )}
-
-      {!empty && (
-        <section className="stats-grid" aria-label="Viewing totals">
-          <div className="stat-card">
-            <Film />
-            <strong>{data.stats.watchedMovies}</strong>
-            <span>movies watched</span>
-          </div>
-          <div className="stat-card">
-            <Tv />
-            <strong>{data.stats.watchedEpisodes}</strong>
-            <span>episodes watched</span>
-          </div>
-          <div className="stat-card accent">
-            <Waves />
-            <strong>{data.stats.watchEvents}</strong>
-            <span>total plays</span>
-          </div>
-        </section>
       )}
 
       <section className="content-section">

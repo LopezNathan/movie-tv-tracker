@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, desc, eq, inArray, lt } from 'drizzle-orm';
+import { and, asc, desc, eq, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -10,7 +10,15 @@ import type {
   MediaRecord,
   WatchEventRecord,
 } from '../shared/types';
-import { importIssues, importRuns, listEntries, media, ratings, watchEvents } from './db/schema';
+import {
+  importIssues,
+  importRuns,
+  listEntries,
+  media,
+  ratings,
+  upNextExclusions,
+  watchEvents,
+} from './db/schema';
 import type { AppEnv } from './env';
 import { requireUser } from './lib/auth';
 import { processImportBatch } from './lib/import-service';
@@ -93,40 +101,46 @@ app.get(
 app.get('/api/dashboard', async (c) => {
   const db = drizzle(c.env.DB);
   const user = c.get('user');
-  const [recentRows, watchlistRows, allEventRows, episodeRows, showRows] = await Promise.all([
-    db
-      .select({ event: watchEvents, item: media })
-      .from(watchEvents)
-      .innerJoin(media, eq(watchEvents.mediaId, media.id))
-      .where(eq(watchEvents.userId, user.id))
-      .orderBy(desc(watchEvents.watchedAt), desc(watchEvents.id))
-      .limit(12),
-    db
-      .select({ item: media })
-      .from(listEntries)
-      .innerJoin(media, eq(listEntries.mediaId, media.id))
-      .where(and(eq(listEntries.userId, user.id), eq(listEntries.list, 'watchlist')))
-      .orderBy(desc(listEntries.addedAt))
-      .limit(12),
-    db
-      .select({ mediaId: watchEvents.mediaId, kind: media.kind, seriesId: media.seriesId })
-      .from(watchEvents)
-      .innerJoin(media, eq(watchEvents.mediaId, media.id))
-      .where(eq(watchEvents.userId, user.id)),
-    db
-      .select()
-      .from(media)
-      .where(eq(media.kind, 'episode'))
-      .orderBy(asc(media.seasonNumber), asc(media.episodeNumber)),
-    db.select().from(media).where(eq(media.kind, 'show')),
-  ]);
+  const [recentRows, watchlistRows, allEventRows, episodeRows, showRows, excludedRows] =
+    await Promise.all([
+      db
+        .select({ event: watchEvents, item: media })
+        .from(watchEvents)
+        .innerJoin(media, eq(watchEvents.mediaId, media.id))
+        .where(eq(watchEvents.userId, user.id))
+        .orderBy(desc(watchEvents.watchedAt), desc(watchEvents.id))
+        .limit(12),
+      db
+        .select({ item: media })
+        .from(listEntries)
+        .innerJoin(media, eq(listEntries.mediaId, media.id))
+        .where(and(eq(listEntries.userId, user.id), eq(listEntries.list, 'watchlist')))
+        .orderBy(desc(listEntries.addedAt))
+        .limit(12),
+      db
+        .select({ mediaId: watchEvents.mediaId, kind: media.kind, seriesId: media.seriesId })
+        .from(watchEvents)
+        .innerJoin(media, eq(watchEvents.mediaId, media.id))
+        .where(eq(watchEvents.userId, user.id)),
+      db
+        .select()
+        .from(media)
+        .where(eq(media.kind, 'episode'))
+        .orderBy(asc(media.seasonNumber), asc(media.episodeNumber)),
+      db.select().from(media).where(eq(media.kind, 'show')),
+      db
+        .select({ showId: upNextExclusions.showId })
+        .from(upNextExclusions)
+        .where(eq(upNextExclusions.userId, user.id)),
+    ]);
 
   const watchedIds = new Set(allEventRows.map((row) => row.mediaId));
+  const excludedShowIds = new Set(excludedRows.map((row) => row.showId));
   const startedShowIds = new Set(
     allEventRows.flatMap((row) => (row.seriesId ? [row.seriesId] : [])),
   );
   const upNext = showRows
-    .filter((show) => startedShowIds.has(show.id))
+    .filter((show) => startedShowIds.has(show.id) && !excludedShowIds.has(show.id))
     .map((show) => ({
       show: show as MediaRecord,
       progress: calculateProgress(show.id, episodeRows as MediaRecord[], watchedIds),
@@ -175,14 +189,19 @@ app.get(
             .where(eq(media.seriesId, item.id))
             .orderBy(asc(media.seasonNumber), asc(media.episodeNumber))
         : [];
-    const relevantIds =
-      kind === 'show' ? [item.id, ...episodes.map((episode) => episode.id)] : [item.id];
-    const [eventRows, rating, listEntry, watchedIds] = await Promise.all([
+    const [eventRows, rating, listEntry, watchedIds, upNextExclusion] = await Promise.all([
       db
         .select({ event: watchEvents, item: media })
         .from(watchEvents)
         .innerJoin(media, eq(watchEvents.mediaId, media.id))
-        .where(and(eq(watchEvents.userId, user.id), inArray(watchEvents.mediaId, relevantIds)))
+        .where(
+          and(
+            eq(watchEvents.userId, user.id),
+            kind === 'show'
+              ? or(eq(media.id, item.id), eq(media.seriesId, item.id))
+              : eq(media.id, item.id),
+          ),
+        )
         .orderBy(desc(watchEvents.watchedAt)),
       db
         .select()
@@ -201,6 +220,13 @@ app.get(
         )
         .get(),
       getWatchedIds(db, user.id),
+      kind === 'show'
+        ? db
+            .select({ id: upNextExclusions.id })
+            .from(upNextExclusions)
+            .where(and(eq(upNextExclusions.userId, user.id), eq(upNextExclusions.showId, item.id)))
+            .get()
+        : Promise.resolve(undefined),
     ]);
     const payload: MediaDetailResponse = {
       media: item,
@@ -208,6 +234,7 @@ app.get(
       watchEvents: eventRows.map(eventRecord),
       rating: rating?.rating ?? null,
       inWatchlist: Boolean(listEntry),
+      hiddenFromUpNext: Boolean(upNextExclusion),
       progress:
         kind === 'show' ? calculateProgress(item.id, episodes as MediaRecord[], watchedIds) : null,
     };
@@ -415,6 +442,41 @@ app.delete('/api/watchlist/:mediaId', zValidator('param', mediaIdParam), async (
   return c.body(null, 204);
 });
 
+app.put(
+  '/api/up-next/:mediaId',
+  zValidator('param', mediaIdParam),
+  zValidator('json', z.object({ hidden: z.boolean() })),
+  async (c) => {
+    const db = drizzle(c.env.DB);
+    const user = c.get('user');
+    const { mediaId } = c.req.valid('param');
+    const { hidden } = c.req.valid('json');
+    const show = await db
+      .select({ id: media.id })
+      .from(media)
+      .where(and(eq(media.id, mediaId), eq(media.kind, 'show')))
+      .get();
+    if (!show) throw new HTTPException(404, { message: 'Show not found.' });
+
+    if (hidden) {
+      await db
+        .insert(upNextExclusions)
+        .values({
+          id: crypto.randomUUID(),
+          userId: user.id,
+          showId: mediaId,
+          hiddenAt: new Date().toISOString(),
+        })
+        .onConflictDoNothing();
+    } else {
+      await db
+        .delete(upNextExclusions)
+        .where(and(eq(upNextExclusions.userId, user.id), eq(upNextExclusions.showId, mediaId)));
+    }
+    return c.json({ hiddenFromUpNext: hidden });
+  },
+);
+
 app.post(
   '/api/bulk-watch',
   zValidator(
@@ -544,11 +606,12 @@ app.post('/api/imports/:id/finalize', async (c) => {
 app.get('/api/export.json', async (c) => {
   const db = drizzle(c.env.DB);
   const user = c.get('user');
-  const [items, events, userRatings, watchlist] = await Promise.all([
+  const [items, events, userRatings, watchlist, hiddenUpNext] = await Promise.all([
     db.select().from(media),
     db.select().from(watchEvents).where(eq(watchEvents.userId, user.id)),
     db.select().from(ratings).where(eq(ratings.userId, user.id)),
     db.select().from(listEntries).where(eq(listEntries.userId, user.id)),
+    db.select().from(upNextExclusions).where(eq(upNextExclusions.userId, user.id)),
   ]);
   c.header(
     'Content-Disposition',
@@ -562,6 +625,7 @@ app.get('/api/export.json', async (c) => {
     watchEvents: events,
     ratings: userRatings,
     watchlist,
+    hiddenUpNext,
   });
 });
 

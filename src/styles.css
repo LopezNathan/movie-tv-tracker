@@ -146,6 +146,36 @@ button {
   font-weight: 650;
   letter-spacing: -0.03em;
 }
+.header-stats {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  height: 100%;
+  align-items: center;
+}
+.header-stat {
+  display: grid;
+  min-width: 76px;
+  gap: 0.08rem;
+  padding: 0 1rem;
+  border-left: 1px solid var(--line);
+}
+.header-stat strong {
+  font-family: var(--display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  line-height: 1;
+}
+.header-stat small {
+  color: var(--muted);
+  font-size: 0.5rem;
+  font-weight: 750;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+}
+.header-stat.accent strong {
+  color: var(--accent);
+}
 .main-content {
   width: min(1180px, calc(100vw - 2rem));
   margin: 0 auto;
@@ -440,61 +470,6 @@ h3 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 1px;
-  border: 1px solid var(--line);
-  background: var(--line);
-}
-.stat-card {
-  position: relative;
-  display: grid;
-  min-height: 180px;
-  gap: 0.6rem;
-  padding: 1.35rem;
-  overflow: hidden;
-  background: var(--surface);
-}
-.stat-card::after {
-  position: absolute;
-  right: 1rem;
-  bottom: -0.55em;
-  color: #ffffff08;
-  content: 'SCENE';
-  font-family: var(--display);
-  font-size: 4rem;
-  font-style: italic;
-}
-.stat-card svg {
-  color: var(--muted);
-}
-.stat-card strong {
-  position: relative;
-  z-index: 1;
-  align-self: end;
-  font-family: var(--display);
-  font-size: 3.6rem;
-  font-weight: 500;
-  line-height: 0.8;
-  letter-spacing: -0.07em;
-}
-.stat-card span {
-  color: var(--muted);
-  font-size: 0.65rem;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-}
-.stat-card.accent {
-  background: var(--accent);
-  color: var(--accent-ink);
-}
-.stat-card.accent svg,
-.stat-card.accent span {
-  color: #554b16;
-}
-
 .up-next-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr));
@@ -1238,14 +1213,15 @@ h3 {
     align-items: start;
     flex-direction: column;
   }
-  .stats-grid {
-    grid-template-columns: 1fr 1fr;
-  }
   .recent-grid {
     grid-template-columns: 1fr;
   }
-  .stat-card:last-child {
-    grid-column: 1 / -1;
+  .header-stat {
+    min-width: 0;
+    padding: 0 0.55rem;
+  }
+  .header-stat small {
+    font-size: 0.42rem;
   }
   .poster-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
