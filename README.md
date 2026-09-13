@@ -6,7 +6,8 @@ A private, installable movie and television tracker. Scene keeps watch history, 
 
 ## Requirements
 
-- Node.js 22 or newer
+- Node.js 26.8.2 or newer (see `.nvmrc`)
+- npm 12 or newer
 - A free Cloudflare account for production
 - A TMDB API read-access token
 

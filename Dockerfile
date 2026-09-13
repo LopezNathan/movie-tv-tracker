@@ -1,4 +1,8 @@
-FROM node:22-bookworm-slim AS build
+FROM node:26.8.2-bookworm-slim AS base
+
+RUN npm install --global npm@12.0.2
+
+FROM base AS build
 
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -6,7 +10,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:22-bookworm-slim AS runtime
+FROM base AS runtime
 
 ENV NODE_ENV=production
 WORKDIR /app
