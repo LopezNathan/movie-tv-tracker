@@ -44,6 +44,9 @@ jobs:
       - name: Configure test environment
         run: cp .dev.vars.example .dev.vars
 
+      - name: Apply local database migrations
+        run: npm run db:migrate:local
+
       - name: Run end-to-end tests
         run: npm run test:e2e
 
