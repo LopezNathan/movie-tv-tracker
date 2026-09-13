@@ -1,0 +1,61 @@
+services:
+  scene:
+    build: .
+    restart: unless-stopped
+    environment:
+      AUTH_MODE: ${AUTH_MODE:-tailnet-single-user}
+      APP_USER_EMAIL: ${APP_USER_EMAIL:-}
+      TMDB_API_TOKEN: ${TMDB_API_TOKEN:?Set TMDB_API_TOKEN in .env}
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:-}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
+    volumes:
+      - scene-data:/data
+    ports:
+      - '127.0.0.1:8787:8787'
+    networks:
+      scene:
+        aliases:
+          - scene-app
+
+  tailscale:
+    profiles:
+      - tailscale
+    image: tailscale/tailscale:stable
+    hostname: ${TS_HOSTNAME:-scene}
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_AUTH_ONCE: 'true'
+      TS_EXTRA_ARGS: ${TS_EXTRA_ARGS:-}
+      TS_SERVE_CONFIG: /config/serve.json
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: 'true'
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./docker/tailscale-serve.json:/config/serve.json:ro
+    depends_on:
+      scene:
+        condition: service_healthy
+    networks:
+      - scene
+
+  cloudflared:
+    profiles:
+      - cloudflare
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${CF_TUNNEL_TOKEN:-}
+    depends_on:
+      scene:
+        condition: service_healthy
+    networks:
+      - scene
+
+volumes:
+  scene-data:
+  tailscale-state:
+
+networks:
+  scene:

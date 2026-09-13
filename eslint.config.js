@@ -21,4 +21,8 @@ export default tseslint.config(
     files: ['worker/**/*.ts'],
     languageOptions: { globals: globals.worker },
   },
+  {
+    files: ['docker/**/*.mjs'],
+    languageOptions: { globals: globals.node },
+  },
 );

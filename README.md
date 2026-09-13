@@ -43,7 +43,13 @@ Vitest runs unit tests plus API integration tests against isolated Miniflare D1 
 
 ## Production
 
-See [DEPLOYMENT.md](./DEPLOYMENT.md) for D1 creation, secret entry, Cloudflare Access protection, workers.dev deployment, and post-deploy checks. No live resources are provisioned by this repository.
+Two deployment paths are supported:
+
+- [Cloudflare Workers](./DEPLOYMENT.md) with hosted D1 and Cloudflare Access.
+- [Docker with Tailscale](./DOCKER.md) with persistent local D1 storage and private tailnet access.
+- [Docker with Cloudflare Tunnel](./CLOUDFLARE.md) with persistent local D1 storage, a custom hostname, and Cloudflare Access.
+
+No live resources are provisioned by this repository.
 
 ## Offline behavior
 

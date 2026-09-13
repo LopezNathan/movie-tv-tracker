@@ -10,12 +10,18 @@ async function verifiedAccessIdentity(c: Context<AppEnv>): Promise<AccessIdentit
   if (!token) return null;
   const teamDomain = c.env.CF_ACCESS_TEAM_DOMAIN?.replace(/^https?:\/\//, '').replace(/\/$/, '');
   const audience = c.env.CF_ACCESS_AUD;
+  const encodedKeys = c.env.CF_ACCESS_JWKS_B64;
   if (!teamDomain || !audience) {
     throw new HTTPException(503, { message: 'Cloudflare Access validation is not configured.' });
   }
   try {
+    const keys = encodedKeys
+      ? (JSON.parse(atob(encodedKeys)) as NonNullable<
+          Parameters<typeof Jwt.verifyWithJwks>[1]['keys']
+        >)
+      : undefined;
     const payload = await Jwt.verifyWithJwks(token, {
-      jwks_uri: `https://${teamDomain}/cdn-cgi/access/certs`,
+      ...(keys ? { keys } : { jwks_uri: `https://${teamDomain}/cdn-cgi/access/certs` }),
       allowedAlgorithms: ['RS256'],
       verification: { iss: `https://${teamDomain}`, aud: audience },
     });
@@ -23,17 +29,32 @@ async function verifiedAccessIdentity(c: Context<AppEnv>): Promise<AccessIdentit
       sub: typeof payload.sub === 'string' ? payload.sub : undefined,
       email: typeof payload.email === 'string' ? payload.email : undefined,
     };
-  } catch {
+  } catch (error) {
+    console.warn(
+      'Cloudflare Access token validation failed:',
+      error instanceof Error ? error.message : 'Unknown validation error',
+    );
     throw new HTTPException(401, { message: 'Cloudflare Access token is invalid.' });
   }
 }
 
 export async function requireUser(c: Context<AppEnv>, next: Next) {
   const production = c.env.ENVIRONMENT === 'production';
-  const identity = production ? await verifiedAccessIdentity(c) : null;
-  const devEmail = !production ? c.env.DEV_USER_EMAIL : undefined;
-  const email = identity?.email ?? devEmail;
-  const subject = identity?.sub ?? (devEmail ? `dev:${devEmail.toLowerCase()}` : undefined);
+  const tailnetSingleUser = c.env.AUTH_MODE === 'tailnet-single-user';
+  const identity = production && !tailnetSingleUser ? await verifiedAccessIdentity(c) : null;
+  const localEmail = tailnetSingleUser
+    ? c.env.APP_USER_EMAIL
+    : !production
+      ? c.env.DEV_USER_EMAIL
+      : undefined;
+  const email = identity?.email ?? localEmail;
+  const subject =
+    identity?.sub ??
+    (tailnetSingleUser && localEmail
+      ? 'tailnet:single-user'
+      : localEmail
+        ? `dev:${localEmail.toLowerCase()}`
+        : undefined);
 
   if (!email || !subject) {
     throw new HTTPException(401, { message: 'Authentication is required.' });

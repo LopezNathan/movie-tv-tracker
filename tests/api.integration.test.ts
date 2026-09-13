@@ -26,12 +26,26 @@ afterEach(async () => {
 
 describe('tracker API with local D1', () => {
   it('rejects production requests without a validated Access token', async () => {
-    const response = await request('/api/health', undefined, {
+    const response = await request('/api/me', undefined, {
       ...harness.env,
       ENVIRONMENT: 'production',
       DEV_USER_EMAIL: 'must-not-be-used@example.test',
     });
     expect(response.status).toBe(401);
+  });
+
+  it('accepts the configured single user when protected by a tailnet', async () => {
+    const response = await request('/api/me', undefined, {
+      ...harness.env,
+      ENVIRONMENT: 'production',
+      AUTH_MODE: 'tailnet-single-user',
+      APP_USER_EMAIL: 'Owner@Example.test',
+      DEV_USER_EMAIL: undefined,
+    });
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      user: { id: 'tailnet:single-user', email: 'owner@example.test' },
+    });
   });
 
   it('preserves rewatches, supports undo, and validates ratings', async () => {

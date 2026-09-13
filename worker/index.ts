@@ -79,9 +79,9 @@ async function getWatchedIds(db: ReturnType<typeof drizzle>, userId: string) {
   return new Set(rows.map((row) => row.mediaId));
 }
 
+app.get('/api/health', (c) => c.json({ ok: true, environment: c.env.ENVIRONMENT }));
 app.use('/api/*', requireUser);
 
-app.get('/api/health', (c) => c.json({ ok: true, environment: c.env.ENVIRONMENT }));
 app.get('/api/me', (c) => c.json({ user: c.get('user') }));
 
 app.get(
