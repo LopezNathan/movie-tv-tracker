@@ -25,6 +25,68 @@ afterEach(async () => {
 });
 
 describe('tracker API with local D1', () => {
+  it('creates a user once without mutating it on a matching subsequent request', async () => {
+    await harness.database
+      .prepare(
+        `CREATE TABLE user_mutations (
+          operation TEXT NOT NULL
+        )`,
+      )
+      .run();
+    await harness.database
+      .prepare(
+        `CREATE TRIGGER users_insert_audit AFTER INSERT ON users
+         BEGIN INSERT INTO user_mutations (operation) VALUES ('insert'); END`,
+      )
+      .run();
+    await harness.database
+      .prepare(
+        `CREATE TRIGGER users_update_audit AFTER UPDATE ON users
+         BEGIN INSERT INTO user_mutations (operation) VALUES ('update'); END`,
+      )
+      .run();
+
+    expect((await request('/api/me')).status).toBe(200);
+    expect((await request('/api/me')).status).toBe(200);
+
+    const users = await harness.database.prepare('SELECT id, email FROM users').all();
+    const mutations = await harness.database
+      .prepare('SELECT operation FROM user_mutations ORDER BY rowid')
+      .all();
+    expect(users.results).toEqual([{ id: 'dev:owner@example.test', email: 'owner@example.test' }]);
+    expect(mutations.results).toEqual([{ operation: 'insert' }]);
+  });
+
+  it('updates an existing user when the authenticated email changes for the same subject', async () => {
+    await harness.database
+      .prepare('INSERT INTO users (id, email, created_at) VALUES (?, ?, ?)')
+      .bind('tailnet:single-user', 'old@example.test', '2026-01-01T00:00:00.000Z')
+      .run();
+
+    const response = await request('/api/me', undefined, {
+      ...harness.env,
+      ENVIRONMENT: 'production',
+      AUTH_MODE: 'tailnet-single-user',
+      APP_USER_EMAIL: 'New@Example.test',
+      DEV_USER_EMAIL: undefined,
+    });
+
+    expect(response.status).toBe(200);
+    const user = await harness.database
+      .prepare('SELECT email, created_at AS createdAt FROM users WHERE id = ?')
+      .bind('tailnet:single-user')
+      .first();
+    expect(user).toEqual({ email: 'new@example.test', createdAt: '2026-01-01T00:00:00.000Z' });
+  });
+
+  it('handles concurrent first requests without duplicate or inconsistent users', async () => {
+    const responses = await Promise.all([request('/api/me'), request('/api/me')]);
+
+    expect(responses.map(({ status }) => status)).toEqual([200, 200]);
+    const users = await harness.database.prepare('SELECT id, email FROM users').all();
+    expect(users.results).toEqual([{ id: 'dev:owner@example.test', email: 'owner@example.test' }]);
+  });
+
   it('rejects production requests without a validated Access token', async () => {
     const response = await request('/api/me', undefined, {
       ...harness.env,
@@ -32,6 +94,36 @@ describe('tracker API with local D1', () => {
       DEV_USER_EMAIL: 'must-not-be-used@example.test',
     });
     expect(response.status).toBe(401);
+  });
+
+  it('rejects an invalid Access token', async () => {
+    const response = await request(
+      '/api/me',
+      { headers: { 'Cf-Access-Jwt-Assertion': 'not-a-jwt' } },
+      {
+        ...harness.env,
+        ENVIRONMENT: 'production',
+        DEV_USER_EMAIL: undefined,
+        CF_ACCESS_TEAM_DOMAIN: 'scene.cloudflareaccess.com',
+        CF_ACCESS_AUD: 'scene-audience',
+      },
+    );
+    expect(response.status).toBe(401);
+  });
+
+  it('returns 503 when Access validation is not configured', async () => {
+    const response = await request(
+      '/api/me',
+      {
+        headers: { 'Cf-Access-Jwt-Assertion': 'not-a-jwt' },
+      },
+      {
+        ...harness.env,
+        ENVIRONMENT: 'production',
+        DEV_USER_EMAIL: undefined,
+      },
+    );
+    expect(response.status).toBe(503);
   });
 
   it('accepts the configured single user when protected by a tailnet', async () => {

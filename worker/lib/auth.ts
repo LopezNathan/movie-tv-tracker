@@ -1,9 +1,37 @@
 import { drizzle } from 'drizzle-orm/d1';
+import { eq, ne } from 'drizzle-orm';
 import type { Context, Next } from 'hono';
 import { HTTPException } from 'hono/http-exception';
 import { Jwt } from 'hono/utils/jwt';
 import { users } from '../db/schema';
 import type { AccessIdentity, AppEnv } from '../env';
+
+type Database = ReturnType<typeof drizzle>;
+type AuthenticatedUser = { id: string; email: string };
+
+export async function syncAuthenticatedUser(db: Database, user: AuthenticatedUser) {
+  const existing = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, user.id))
+    .get();
+
+  if (existing) {
+    if (existing.email !== user.email) {
+      await db.update(users).set({ email: user.email }).where(eq(users.id, user.id));
+    }
+    return;
+  }
+
+  await db
+    .insert(users)
+    .values({ ...user, createdAt: new Date().toISOString() })
+    .onConflictDoUpdate({
+      target: users.id,
+      set: { email: user.email },
+      setWhere: ne(users.email, user.email),
+    });
+}
 
 async function verifiedAccessIdentity(c: Context<AppEnv>): Promise<AccessIdentity | null> {
   const token = c.req.header('Cf-Access-Jwt-Assertion');
@@ -62,10 +90,7 @@ export async function requireUser(c: Context<AppEnv>, next: Next) {
 
   const user = { id: subject, email: email.toLowerCase() };
   const db = drizzle(c.env.DB);
-  await db
-    .insert(users)
-    .values({ ...user, createdAt: new Date().toISOString() })
-    .onConflictDoUpdate({ target: users.id, set: { email: user.email } });
+  await syncAuthenticatedUser(db, user);
   c.set('user', user);
   await next();
 }
