@@ -2,6 +2,14 @@
   "$schema": "./node_modules/wrangler/config-schema.json",
   "name": "movie-tv-tracker",
   "main": "./worker/index.ts",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    {
+      "pattern": "scene.nathanlopez.com",
+      "custom_domain": true,
+    },
+  ],
   "compatibility_date": "2026-09-07",
   "compatibility_flags": ["nodejs_compat"],
   "assets": {
@@ -14,13 +22,13 @@
     {
       "binding": "DB",
       "database_name": "movie-tv-tracker",
-      "database_id": "00000000-0000-0000-0000-000000000000",
+      "database_id": "25352a93-f7be-4e2e-85ff-711b51ed207e",
       "migrations_dir": "migrations",
     },
   ],
   "vars": {
     "ENVIRONMENT": "production",
-    "CF_ACCESS_TEAM_DOMAIN": "your-team.cloudflareaccess.com",
-    "CF_ACCESS_AUD": "replace-with-access-application-aud-tag",
+    "CF_ACCESS_TEAM_DOMAIN": "lopeznathan.cloudflareaccess.com",
+    "CF_ACCESS_AUD": "3b32dc57a4364de3169f42437713e12612202884ba348f50db7a982157a1c24d",
   },
 }

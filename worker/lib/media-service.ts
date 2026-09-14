@@ -64,13 +64,8 @@ async function hydrateEpisodes(env: Bindings, show: typeof media.$inferSelect, s
 
     for (const result of results) {
       for (const episode of result.data.episodes) {
-        const existing = await db
-          .select({ id: media.id })
-          .from(media)
-          .where(and(eq(media.kind, 'episode'), eq(media.tmdbId, episode.id)))
-          .get();
         const values: typeof media.$inferInsert = {
-          id: existing?.id ?? crypto.randomUUID(),
+          id: crypto.randomUUID(),
           kind: 'episode',
           tmdbId: episode.id,
           title: episode.name,

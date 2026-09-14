@@ -608,7 +608,7 @@ app.post(
 
 app.post(
   '/api/imports/:id/batches',
-  zValidator('json', z.object({ items: z.array(importItemSchema).min(1).max(25) })),
+  zValidator('json', z.object({ items: z.array(importItemSchema).min(1).max(5) })),
   async (c) => {
     const result = await processImportBatch(
       c.env,

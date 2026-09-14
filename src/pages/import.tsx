@@ -32,7 +32,9 @@ function issueItem(issue: ImportIssue) {
   }
 }
 
-const batchSize = 25;
+// A new TV series can require hydrating every episode before its first watch is saved.
+// Keep import requests small enough to stay within Worker and D1 per-request limits.
+const batchSize = 5;
 
 async function createRun(filename: string, items: NormalizedImportItem[]) {
   const { run } = await api<{ run: ImportRun }>(
