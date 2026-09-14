@@ -3,7 +3,7 @@ import { AlertTriangle, CheckCircle2, FileArchive, LoaderCircle, Upload } from '
 import { useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import type { NormalizedImportItem } from '../../shared/types';
-import { api, json } from '../lib/api';
+import { api, apiWithRetry, json } from '../lib/api';
 import { importStore, type PendingImport } from '../lib/import-store';
 import { parseTraktExport, type ParsedTraktExport } from '../lib/trakt-import';
 
@@ -50,6 +50,7 @@ export function ImportPage() {
   const [pending, setPending] = useState<PendingImport | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const [retryMessage, setRetryMessage] = useState('');
 
   useEffect(() => {
     void importStore.get().then((saved) => saved && setPending(saved));
@@ -79,6 +80,7 @@ export function ImportPage() {
     }
     setBusy(true);
     setError('');
+    setRetryMessage('');
     try {
       let current = initial;
       if (!current) {
@@ -89,7 +91,17 @@ export function ImportPage() {
       }
       while (current.nextIndex < current.items.length) {
         const items = current.items.slice(current.nextIndex, current.nextIndex + batchSize);
-        await api(`/api/imports/${current.runId}/batches`, json('POST', { items }));
+        await apiWithRetry(
+          `/api/imports/${current.runId}/batches`,
+          json('POST', { items, batchId: `${current.runId}:${current.nextIndex}` }),
+          {
+            onRetry: (attempt, delayMs) =>
+              setRetryMessage(
+                `Connection interrupted. Retrying automatically (attempt ${attempt} of 5) in ${Math.ceil(delayMs / 1_000)}s…`,
+              ),
+          },
+        );
+        setRetryMessage('');
         current = { ...current, nextIndex: current.nextIndex + items.length };
         await importStore.save(current);
         setPending(current);
@@ -100,6 +112,7 @@ export function ImportPage() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'Import paused. You can resume safely.');
     } finally {
+      setRetryMessage('');
       setBusy(false);
     }
   }
@@ -153,6 +166,7 @@ export function ImportPage() {
           <AlertTriangle /> {error}
         </div>
       ) : null}
+      {retryMessage ? <div className="notice">{retryMessage}</div> : null}
       {preview && !pending ? (
         <section className="panel preview-panel">
           <div>

@@ -305,7 +305,7 @@ describe('tracker API with local D1', () => {
     expect((await response.json<{ episodes: unknown[] }>()).episodes).toHaveLength(110);
   });
 
-  it('deduplicates the same imported watch event', async () => {
+  it('deduplicates a retried import batch without double-counting progress', async () => {
     await request('/api/health');
     await seedMedia(harness.database, { id: 'movie-1', kind: 'movie', tmdbId: 1, title: 'Film' });
     const run = await (
@@ -324,17 +324,90 @@ describe('tracker API with local D1', () => {
       fingerprint: 'watch|movie|1|2026-01-01',
     };
     const first = await (
-      await request(`/api/imports/${run.run.id}/batches`, body('POST', { items: [item] }))
-    ).json<{ imported: number; skipped: number }>();
+      await request(
+        `/api/imports/${run.run.id}/batches`,
+        body('POST', { items: [item], batchId: `${run.run.id}:0` }),
+      )
+    ).json<{ imported: number; skipped: number; duplicate?: boolean }>();
     const duplicate = await (
-      await request(`/api/imports/${run.run.id}/batches`, body('POST', { items: [item] }))
-    ).json<{ imported: number; skipped: number }>();
+      await request(
+        `/api/imports/${run.run.id}/batches`,
+        body('POST', { items: [item], batchId: `${run.run.id}:0` }),
+      )
+    ).json<{ imported: number; skipped: number; duplicate?: boolean }>();
     expect(first).toMatchObject({ imported: 1, skipped: 0 });
-    expect(duplicate).toMatchObject({ imported: 0, skipped: 1 });
+    expect(duplicate).toMatchObject({ imported: 1, skipped: 0, duplicate: true });
     const count = await harness.database
       .prepare('SELECT count(*) count FROM watch_events')
       .first<{ count: number }>();
     expect(count?.count).toBe(1);
+    const progress = await harness.database
+      .prepare('SELECT processed_items processedItems FROM import_runs WHERE id = ?')
+      .bind(run.run.id)
+      .first<{ processedItems: number }>();
+    expect(progress?.processedItems).toBe(1);
+  });
+
+  it('hydrates only the requested episode while importing history', async () => {
+    const fetchMock = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      const payload = url.includes('/season/1')
+        ? {
+            episodes: [1, 2, 3].map((episodeNumber) => ({
+              id: 500 + episodeNumber,
+              name: `Episode ${episodeNumber}`,
+              air_date: '2026-01-01',
+              episode_number: episodeNumber,
+              season_number: 1,
+            })),
+          }
+        : {
+            id: 50,
+            media_type: 'tv',
+            name: 'Large show',
+            status: 'Ended',
+            number_of_seasons: 30,
+            external_ids: {},
+          };
+      return new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const run = await (
+      await request(
+        '/api/imports',
+        body('POST', { source: 'trakt', filename: 'export.zip', totalItems: 1 }),
+      )
+    ).json<{ run: { id: string } }>();
+    const item = {
+      action: 'watch',
+      kind: 'episode',
+      title: 'Episode 2',
+      showTitle: 'Large show',
+      showTmdbId: 50,
+      seasonNumber: 1,
+      episodeNumber: 2,
+      watchedAt: '2026-01-01T00:00:00.000Z',
+      sourceEventId: 'trakt-history-episode-2',
+      fingerprint: 'watch|episode|50|1|2|2026-01-01',
+    };
+
+    const response = await request(
+      `/api/imports/${run.run.id}/batches`,
+      body('POST', { items: [item], batchId: `${run.run.id}:0` }),
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ imported: 1, issues: 0 });
+    const episodes = await harness.database
+      .prepare(
+        "SELECT tmdb_id tmdbId, episode_number episodeNumber FROM media WHERE kind = 'episode'",
+      )
+      .all();
+    expect(episodes.results).toEqual([{ tmdbId: 502, episodeNumber: 2 }]);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
   it('refreshes stale continuing shows and discovers new episodes', async () => {

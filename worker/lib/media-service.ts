@@ -3,7 +3,7 @@ import { drizzle } from 'drizzle-orm/d1';
 import type { MediaRecord } from '../../shared/types';
 import { media } from '../db/schema';
 import type { Bindings } from '../env';
-import { getTmdbDetails, getTmdbSeason, type TmdbDetails } from './tmdb';
+import { getTmdbDetails, getTmdbSeason, type TmdbDetails, type TmdbSeason } from './tmdb';
 
 function yearFrom(value?: string) {
   return Number(value?.slice(0, 4)) || null;
@@ -48,9 +48,68 @@ function detailValues(
   };
 }
 
-async function hydrateEpisodes(env: Bindings, show: typeof media.$inferSelect, seasons: number) {
+function episodeValues(
+  show: MediaRecord,
+  episode: TmdbSeason['episodes'][number],
+  now: string,
+): typeof media.$inferInsert {
+  return {
+    id: crypto.randomUUID(),
+    kind: 'episode',
+    tmdbId: episode.id,
+    title: episode.name,
+    originalTitle: null,
+    releaseYear: yearFrom(episode.air_date),
+    overview: episode.overview ?? null,
+    posterPath: episode.still_path ?? show.posterPath,
+    backdropPath: show.backdropPath,
+    status: episode.air_date ? 'Aired or scheduled' : 'Unknown',
+    runtime: episode.runtime ?? show.runtime,
+    seriesId: show.id,
+    seasonNumber: episode.season_number,
+    episodeNumber: episode.episode_number,
+    airDate: episode.air_date ?? null,
+    metadataUpdatedAt: now,
+    createdAt: now,
+  };
+}
+
+async function saveEpisode(
+  env: Bindings,
+  show: MediaRecord,
+  episode: TmdbSeason['episodes'][number],
+  readBack = false,
+) {
   const db = drizzle(env.DB);
   const now = new Date().toISOString();
+  const values = episodeValues(show, episode, now);
+  await db
+    .insert(media)
+    .values(values)
+    .onConflictDoUpdate({
+      target: [media.kind, media.tmdbId],
+      set: {
+        title: values.title,
+        overview: values.overview,
+        posterPath: values.posterPath,
+        backdropPath: values.backdropPath,
+        runtime: values.runtime,
+        seriesId: values.seriesId,
+        seasonNumber: values.seasonNumber,
+        episodeNumber: values.episodeNumber,
+        airDate: values.airDate,
+        metadataUpdatedAt: now,
+      },
+    });
+  if (!readBack) return;
+  return db
+    .select()
+    .from(media)
+    .where(and(eq(media.kind, 'episode'), eq(media.tmdbId, episode.id)))
+    .get();
+}
+
+async function hydrateEpisodes(env: Bindings, show: typeof media.$inferSelect, seasons: number) {
   const seasonNumbers = Array.from({ length: Math.min(seasons, 40) }, (_, index) => index + 1);
 
   for (let start = 0; start < seasonNumbers.length; start += 5) {
@@ -64,54 +123,24 @@ async function hydrateEpisodes(env: Bindings, show: typeof media.$inferSelect, s
 
     for (const result of results) {
       for (const episode of result.data.episodes) {
-        const values: typeof media.$inferInsert = {
-          id: crypto.randomUUID(),
-          kind: 'episode',
-          tmdbId: episode.id,
-          title: episode.name,
-          originalTitle: null,
-          releaseYear: yearFrom(episode.air_date),
-          overview: episode.overview ?? null,
-          posterPath: episode.still_path ?? show.posterPath,
-          backdropPath: show.backdropPath,
-          status: episode.air_date ? 'Aired or scheduled' : 'Unknown',
-          runtime: episode.runtime ?? show.runtime,
-          seriesId: show.id,
-          seasonNumber: episode.season_number,
-          episodeNumber: episode.episode_number,
-          airDate: episode.air_date ?? null,
-          metadataUpdatedAt: now,
-          createdAt: now,
-        };
-        await db
-          .insert(media)
-          .values(values)
-          .onConflictDoUpdate({
-            target: [media.kind, media.tmdbId],
-            set: {
-              title: values.title,
-              overview: values.overview,
-              posterPath: values.posterPath,
-              backdropPath: values.backdropPath,
-              runtime: values.runtime,
-              seriesId: values.seriesId,
-              seasonNumber: values.seasonNumber,
-              episodeNumber: values.episodeNumber,
-              airDate: values.airDate,
-              metadataUpdatedAt: now,
-            },
-          });
+        await saveEpisode(env, show, episode);
       }
     }
   }
 }
 
+type EnsureMediaOptions = {
+  force?: boolean;
+  hydrateEpisodes?: boolean;
+};
+
 export async function ensureMedia(
   env: Bindings,
   kind: 'movie' | 'show',
   tmdbId: number,
-  force = false,
+  options: EnsureMediaOptions = {},
 ) {
+  const { force = false, hydrateEpisodes: shouldHydrateEpisodes = true } = options;
   const db = drizzle(env.DB);
   const existing = await db
     .select()
@@ -152,8 +181,35 @@ export async function ensureMedia(
     .get();
   if (!saved) throw new Error('Media metadata could not be saved.');
 
-  if (kind === 'show') {
+  if (kind === 'show' && shouldHydrateEpisodes) {
     await hydrateEpisodes(env, saved, detail.number_of_seasons ?? 0);
   }
   return saved as MediaRecord;
+}
+
+export async function ensureEpisode(
+  env: Bindings,
+  showTmdbId: number,
+  seasonNumber: number,
+  episodeNumber: number,
+) {
+  const db = drizzle(env.DB);
+  const show = await ensureMedia(env, 'show', showTmdbId, { hydrateEpisodes: false });
+  const existing = await db
+    .select()
+    .from(media)
+    .where(
+      and(
+        eq(media.seriesId, show.id),
+        eq(media.seasonNumber, seasonNumber),
+        eq(media.episodeNumber, episodeNumber),
+      ),
+    )
+    .get();
+  if (existing) return existing as MediaRecord;
+
+  const season = await getTmdbSeason(env, showTmdbId, seasonNumber);
+  const episode = season.episodes.find((item) => item.episode_number === episodeNumber);
+  if (!episode) return null;
+  return (await saveEpisode(env, show, episode, true)) as MediaRecord | undefined;
 }

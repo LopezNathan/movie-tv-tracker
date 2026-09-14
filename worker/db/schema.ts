@@ -158,3 +158,19 @@ export const importIssues = sqliteTable(
     uniqueIndex('import_issues_run_fingerprint_unique').on(table.importRunId, table.fingerprint),
   ],
 );
+
+export const importBatchReceipts = sqliteTable(
+  'import_batch_receipts',
+  {
+    id: text('id').primaryKey(),
+    importRunId: text('import_run_id')
+      .notNull()
+      .references(() => importRuns.id, { onDelete: 'cascade' }),
+    itemCount: integer('item_count').notNull(),
+    importedItems: integer('imported_items').notNull(),
+    skippedItems: integer('skipped_items').notNull(),
+    issueCount: integer('issue_count').notNull(),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [index('import_batch_receipts_run_idx').on(table.importRunId)],
+);

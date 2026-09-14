@@ -179,7 +179,7 @@ app.get(
   async (c) => {
     const { kind, id } = c.req.valid('param');
     const { refresh } = c.req.valid('query');
-    const item = await ensureMedia(c.env, kind, id, refresh === '1');
+    const item = await ensureMedia(c.env, kind, id, { force: refresh === '1' });
     const db = drizzle(c.env.DB);
     const user = c.get('user');
     const episodes =
@@ -608,13 +608,21 @@ app.post(
 
 app.post(
   '/api/imports/:id/batches',
-  zValidator('json', z.object({ items: z.array(importItemSchema).min(1).max(5) })),
+  zValidator(
+    'json',
+    z.object({
+      items: z.array(importItemSchema).min(1).max(5),
+      batchId: z.string().min(1).max(100).optional(),
+    }),
+  ),
   async (c) => {
+    const input = c.req.valid('json');
     const result = await processImportBatch(
       c.env,
       c.get('user').id,
       c.req.param('id'),
-      c.req.valid('json').items,
+      input.items,
+      input.batchId,
     );
     if (!result) throw new HTTPException(404, { message: 'Import run not found.' });
     return c.json(result);

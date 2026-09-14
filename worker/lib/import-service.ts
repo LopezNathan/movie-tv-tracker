@@ -1,9 +1,17 @@
 import { and, eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import type { NormalizedImportItem } from '../../shared/types';
-import { importIssues, importRuns, listEntries, media, ratings, watchEvents } from '../db/schema';
+import {
+  importBatchReceipts,
+  importIssues,
+  importRuns,
+  listEntries,
+  media,
+  ratings,
+  watchEvents,
+} from '../db/schema';
 import type { Bindings } from '../env';
-import { ensureMedia } from './media-service';
+import { ensureEpisode, ensureMedia } from './media-service';
 import { findTmdb, searchTmdb } from './tmdb';
 
 type Resolution = { mediaId?: string; reason?: 'unresolved' | 'ambiguous' | 'invalid' };
@@ -29,12 +37,12 @@ async function resolveTitle(
   kind: 'movie' | 'show',
 ): Promise<Resolution> {
   if (item.tmdbId) {
-    const saved = await ensureMedia(env, kind, item.tmdbId);
+    const saved = await ensureMedia(env, kind, item.tmdbId, { hydrateEpisodes: false });
     return { mediaId: saved.id };
   }
   const external = await externalMatch(env, item, kind);
   if (external.length === 1) {
-    const saved = await ensureMedia(env, kind, external[0].id);
+    const saved = await ensureMedia(env, kind, external[0].id, { hydrateEpisodes: false });
     return { mediaId: saved.id };
   }
   if (external.length > 1) return { reason: 'ambiguous' };
@@ -49,7 +57,7 @@ async function resolveTitle(
       (!item.year || !result.releaseYear || result.releaseYear === item.year),
   );
   if (candidates.length !== 1) return { reason: candidates.length ? 'ambiguous' : 'unresolved' };
-  const saved = await ensureMedia(env, kind, candidates[0].tmdbId);
+  const saved = await ensureMedia(env, kind, candidates[0].tmdbId, { hydrateEpisodes: false });
   return { mediaId: saved.id };
 }
 
@@ -102,18 +110,7 @@ async function resolveEpisode(env: Bindings, item: NormalizedImportItem): Promis
   if (!showTmdbId || seasonNumber === undefined || episodeNumber === undefined) {
     return { reason: 'unresolved' };
   }
-  const show = await ensureMedia(env, 'show', showTmdbId);
-  const episode = await db
-    .select({ id: media.id })
-    .from(media)
-    .where(
-      and(
-        eq(media.seriesId, show.id),
-        eq(media.seasonNumber, seasonNumber),
-        eq(media.episodeNumber, episodeNumber),
-      ),
-    )
-    .get();
+  const episode = await ensureEpisode(env, showTmdbId, seasonNumber, episodeNumber);
   return episode ? { mediaId: episode.id } : { reason: 'unresolved' };
 }
 
@@ -185,6 +182,7 @@ export async function processImportBatch(
   userId: string,
   runId: string,
   items: NormalizedImportItem[],
+  batchId?: string,
 ) {
   const db = drizzle(env.DB);
   const run = await db
@@ -193,6 +191,23 @@ export async function processImportBatch(
     .where(and(eq(importRuns.id, runId), eq(importRuns.userId, userId)))
     .get();
   if (!run) return null;
+
+  if (batchId) {
+    const receipt = await db
+      .select()
+      .from(importBatchReceipts)
+      .where(and(eq(importBatchReceipts.id, batchId), eq(importBatchReceipts.importRunId, runId)))
+      .get();
+    if (receipt) {
+      return {
+        processed: receipt.itemCount,
+        imported: receipt.importedItems,
+        skipped: receipt.skippedItems,
+        issues: receipt.issueCount,
+        duplicate: true,
+      };
+    }
+  }
 
   let imported = 0;
   let skipped = 0;
@@ -248,5 +263,16 @@ export async function processImportBatch(
       updatedAt: new Date().toISOString(),
     })
     .where(eq(importRuns.id, runId));
+  if (batchId) {
+    await db.insert(importBatchReceipts).values({
+      id: batchId,
+      importRunId: runId,
+      itemCount: items.length,
+      importedItems: imported,
+      skippedItems: skipped,
+      issueCount: issues,
+      createdAt: new Date().toISOString(),
+    });
+  }
   return { processed: items.length, imported, skipped, issues };
 }
