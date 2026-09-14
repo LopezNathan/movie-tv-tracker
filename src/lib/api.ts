@@ -104,6 +104,10 @@ export const queries = {
     api<{
       items: Array<{ item: MediaDetailResponse['media']; addedAt: string }>;
     }>('/api/library?filter=watchlist'),
+  watchedLibrary: () =>
+    api<{
+      items: Array<{ item: MediaDetailResponse['media']; watchedAt: string }>;
+    }>('/api/library?filter=watched'),
 };
 
 export function json(method: 'POST' | 'PUT' | 'DELETE', body?: unknown): RequestInit {

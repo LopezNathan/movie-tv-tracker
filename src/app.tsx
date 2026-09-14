@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query';
-import { Clapperboard, Clock3, Download, Home, Search, Settings } from 'lucide-react';
+import { Clapperboard, Clock3, Download, Home, Library, Search, Settings } from 'lucide-react';
 import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
 import { OfflineBanner } from './components/connectivity';
 import { DashboardPage } from './pages/dashboard';
 import { HistoryPage } from './pages/history';
 import { ImportPage, ImportReviewPage } from './pages/import';
+import { LibraryPage } from './pages/library';
 import { MediaDetailPage } from './pages/media-detail';
 import { SearchPage } from './pages/search';
 import { SettingsPage } from './pages/settings';
@@ -15,6 +16,7 @@ const routes = [
   { to: '/', label: 'Home', icon: Home },
   { to: '/search', label: 'Search', icon: Search },
   { to: '/history', label: 'History', icon: Clock3 },
+  { to: '/library', label: 'Library', icon: Library },
   { to: '/watchlist', label: 'Watchlist', icon: Clapperboard },
   { to: '/import', label: 'Import', icon: Download },
   { to: '/settings', label: 'Settings', icon: Settings },
@@ -74,6 +76,7 @@ export function App() {
           <Route path="/" element={<DashboardPage />} />
           <Route path="/search" element={<SearchPage />} />
           <Route path="/history" element={<HistoryPage />} />
+          <Route path="/library" element={<LibraryPage />} />
           <Route path="/watchlist" element={<WatchlistPage />} />
           <Route path="/import" element={<ImportPage />} />
           <Route path="/import/:id/review" element={<ImportReviewPage />} />
