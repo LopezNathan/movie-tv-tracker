@@ -427,6 +427,7 @@ describe('tracker API with local D1', () => {
           JSON.stringify(
             url.includes('/season/1')
               ? {
+                  poster_path: '/season-one.jpg',
                   episodes: [
                     {
                       id: 501,
@@ -434,6 +435,7 @@ describe('tracker API with local D1', () => {
                       air_date: '2026-01-01',
                       episode_number: 1,
                       season_number: 1,
+                      still_path: '/episode-still.jpg',
                     },
                   ],
                 }
@@ -453,8 +455,10 @@ describe('tracker API with local D1', () => {
     const refreshed = await ensureMedia(harness.env, 'show', 50);
     expect(refreshed.title).toBe('Fresh title');
     const episode = await harness.database
-      .prepare("SELECT title FROM media WHERE kind = 'episode'")
-      .first<{ title: string }>();
+      .prepare("SELECT title, poster_path posterPath FROM media WHERE kind = 'episode'")
+      .first<{ title: string; posterPath: string | null }>();
     expect(episode?.title).toBe('New episode');
+    expect(episode?.posterPath).toBe('/season-one.jpg');
   });
+
 });

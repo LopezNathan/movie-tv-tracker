@@ -51,6 +51,7 @@ function detailValues(
 function episodeValues(
   show: MediaRecord,
   episode: TmdbSeason['episodes'][number],
+  seasonPosterPath: string | null,
   now: string,
 ): typeof media.$inferInsert {
   return {
@@ -61,7 +62,7 @@ function episodeValues(
     originalTitle: null,
     releaseYear: yearFrom(episode.air_date),
     overview: episode.overview ?? null,
-    posterPath: episode.still_path ?? show.posterPath,
+    posterPath: seasonPosterPath ?? show.posterPath,
     backdropPath: show.backdropPath,
     status: episode.air_date ? 'Aired or scheduled' : 'Unknown',
     runtime: episode.runtime ?? show.runtime,
@@ -78,11 +79,12 @@ async function saveEpisode(
   env: Bindings,
   show: MediaRecord,
   episode: TmdbSeason['episodes'][number],
+  seasonPosterPath: string | null,
   readBack = false,
 ) {
   const db = drizzle(env.DB);
   const now = new Date().toISOString();
-  const values = episodeValues(show, episode, now);
+  const values = episodeValues(show, episode, seasonPosterPath, now);
   await db
     .insert(media)
     .values(values)
@@ -123,7 +125,7 @@ async function hydrateEpisodes(env: Bindings, show: typeof media.$inferSelect, s
 
     for (const result of results) {
       for (const episode of result.data.episodes) {
-        await saveEpisode(env, show, episode);
+        await saveEpisode(env, show, episode, result.data.poster_path ?? null);
       }
     }
   }
@@ -211,5 +213,6 @@ export async function ensureEpisode(
   const season = await getTmdbSeason(env, showTmdbId, seasonNumber);
   const episode = season.episodes.find((item) => item.episode_number === episodeNumber);
   if (!episode) return null;
-  return (await saveEpisode(env, show, episode, true)) as MediaRecord | undefined;
+  return (await saveEpisode(env, show, episode, season.poster_path ?? null, true)) as
+    MediaRecord | undefined;
 }
