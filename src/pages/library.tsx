@@ -1,9 +1,9 @@
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorState, LoadingState } from '../components/async-state';
 import { MediaCard } from '../components/media-card';
-import { queries } from '../lib/api';
+import { queries, type WatchedLibraryCursor } from '../lib/api';
 
 type LibraryFilter = 'all' | 'movie' | 'show' | 'episode';
 
@@ -16,16 +16,21 @@ const filters: Array<{ value: LibraryFilter; label: string }> = [
 
 export function LibraryPage() {
   const [filter, setFilter] = useState<LibraryFilter>('all');
-  const library = useQuery({ queryKey: ['library', 'watched'], queryFn: queries.watchedLibrary });
+  const kind = filter === 'all' ? undefined : filter;
+  const library = useInfiniteQuery({
+    queryKey: ['library', 'watched', kind],
+    queryFn: ({ pageParam }) => queries.watchedLibrary(kind, pageParam),
+    initialPageParam: null as WatchedLibraryCursor | null,
+    getNextPageParam: (lastPage) => lastPage.nextCursor,
+  });
 
   const items = useMemo(() => {
     if (!library.data) return [];
-    return filter === 'all'
-      ? library.data.items
-      : library.data.items.filter(({ item }) => item.kind === filter);
-  }, [filter, library.data]);
+    return library.data.pages.flatMap((page) => page.items);
+  }, [library.data]);
+  const total = library.data?.pages[0]?.total ?? 0;
 
-  if (library.isLoading) return <LoadingState label="Loading your watched library…" />;
+  if (library.isPending) return <LoadingState label="Loading your watched library…" />;
   if (library.error) return <ErrorState error={library.error} retry={() => library.refetch()} />;
 
   return (
@@ -38,10 +43,12 @@ export function LibraryPage() {
         </p>
       </header>
 
-      {library.data!.items.length ? (
+      {total ? (
         <>
           <div className="library-toolbar" aria-label="Filter watched library">
-            <span className="library-count">{items.length} titles</span>
+            <span className="library-count">
+              {total} title{total === 1 ? '' : 's'}
+            </span>
             <div className="filter-group">
               {filters.map(({ value, label }) => (
                 <button
@@ -57,17 +64,31 @@ export function LibraryPage() {
             </div>
           </div>
           {items.length ? (
-            <div className="poster-grid">
-              {items.map(({ item, watchedAt }) => (
-                <MediaCard
-                  key={item.id}
-                  item={item}
-                  note={`Last watched ${new Intl.DateTimeFormat(undefined, {
-                    dateStyle: 'medium',
-                  }).format(new Date(watchedAt))}`}
-                />
-              ))}
-            </div>
+            <>
+              <div className="poster-grid">
+                {items.map(({ item, watchedAt }) => (
+                  <MediaCard
+                    key={item.id}
+                    item={item}
+                    note={`Last watched ${new Intl.DateTimeFormat(undefined, {
+                      dateStyle: 'medium',
+                    }).format(new Date(watchedAt))}`}
+                  />
+                ))}
+              </div>
+              {library.hasNextPage && (
+                <div className="library-more">
+                  <button
+                    className="button subtle"
+                    type="button"
+                    onClick={() => library.fetchNextPage()}
+                    disabled={library.isFetchingNextPage}
+                  >
+                    {library.isFetchingNextPage ? 'Loading more…' : 'Load more'}
+                  </button>
+                </div>
+              )}
+            </>
           ) : (
             <EmptyState title={`No ${filter}s watched yet`}>
               Try another filter to see more of your library.

@@ -523,6 +523,17 @@ h3 {
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
+.library-more {
+  display: flex;
+  justify-content: center;
+  padding-top: 0.5rem;
+}
+.search-pagination {
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--muted);
+  font-size: 0.8rem;
+}
 .filter-group {
   display: flex;
   flex-wrap: wrap;

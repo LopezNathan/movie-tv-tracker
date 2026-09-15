@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, desc, eq, inArray, lt, or } from 'drizzle-orm';
+import { and, asc, countDistinct, desc, eq, inArray, lt, max, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -316,20 +316,58 @@ app.get(
   '/api/library',
   zValidator(
     'query',
-    z.object({ filter: z.enum(['watchlist', 'watched', 'rated']).default('watchlist') }),
+    z
+      .object({
+        filter: z.enum(['watchlist', 'watched', 'rated']).default('watchlist'),
+        kind: z.enum(['movie', 'show', 'episode']).optional(),
+        before: isoTimestamp.optional(),
+        beforeId: z.string().uuid().optional(),
+        limit: z.coerce.number().int().min(1).max(100).default(60),
+      })
+      .refine(({ before, beforeId }) => Boolean(before) === Boolean(beforeId), {
+        message: 'A library cursor requires both before and beforeId.',
+        path: ['before'],
+      }),
   ),
   async (c) => {
-    const { filter } = c.req.valid('query');
+    const { filter, kind, before, beforeId, limit } = c.req.valid('query');
     const db = drizzle(c.env.DB);
     const user = c.get('user');
     if (filter === 'watchlist') {
-      const rows = await db
-        .select({ item: media, addedAt: listEntries.addedAt })
-        .from(listEntries)
-        .innerJoin(media, eq(listEntries.mediaId, media.id))
-        .where(and(eq(listEntries.userId, user.id), eq(listEntries.list, 'watchlist')))
-        .orderBy(desc(listEntries.addedAt));
-      return c.json({ items: rows });
+      const conditions = [eq(listEntries.userId, user.id), eq(listEntries.list, 'watchlist')];
+      if (kind) conditions.push(eq(media.kind, kind));
+      if (before && beforeId) {
+        conditions.push(
+          or(
+            lt(listEntries.addedAt, before),
+            and(eq(listEntries.addedAt, before), lt(listEntries.id, beforeId)),
+          )!,
+        );
+      }
+      const [rows, totals] = await Promise.all([
+        db
+          .select({ item: media, addedAt: listEntries.addedAt, entryId: listEntries.id })
+          .from(listEntries)
+          .innerJoin(media, eq(listEntries.mediaId, media.id))
+          .where(and(...conditions))
+          .orderBy(desc(listEntries.addedAt), desc(listEntries.id))
+          .limit(limit + 1),
+        db
+          .select({ total: countDistinct(listEntries.id) })
+          .from(listEntries)
+          .innerJoin(media, eq(listEntries.mediaId, media.id))
+          .where(and(...conditions.slice(0, kind ? 3 : 2))),
+      ]);
+      const items = rows.slice(0, limit);
+      const lastItem = items.at(-1);
+      return c.json({
+        items,
+        total: totals[0]?.total ?? 0,
+        nextCursor:
+          rows.length > limit && lastItem
+            ? { watchedAt: lastItem.addedAt, itemId: lastItem.entryId }
+            : null,
+      });
     }
     if (filter === 'rated') {
       const rows = await db
@@ -340,19 +378,47 @@ app.get(
         .orderBy(desc(ratings.ratedAt));
       return c.json({ items: rows });
     }
-    const rows = await db
-      .select({ item: media, watchedAt: watchEvents.watchedAt })
-      .from(watchEvents)
-      .innerJoin(media, eq(watchEvents.mediaId, media.id))
-      .where(eq(watchEvents.userId, user.id))
-      .orderBy(desc(watchEvents.watchedAt));
-    const seen = new Set<string>();
+    const latestWatched = db.$with('latest_watched').as(
+      db
+        .select({
+          mediaId: watchEvents.mediaId,
+          watchedAt: max(watchEvents.watchedAt).as('watched_at'),
+        })
+        .from(watchEvents)
+        .where(eq(watchEvents.userId, user.id))
+        .groupBy(watchEvents.mediaId),
+    );
+    const kindCondition = kind ? eq(media.kind, kind) : undefined;
+    const cursorCondition =
+      before && beforeId
+        ? or(
+            lt(latestWatched.watchedAt, before),
+            and(eq(latestWatched.watchedAt, before), lt(media.id, beforeId)),
+          )
+        : undefined;
+    const [rows, totals] = await Promise.all([
+      db
+        .with(latestWatched)
+        .select({ item: media, watchedAt: latestWatched.watchedAt })
+        .from(latestWatched)
+        .innerJoin(media, eq(latestWatched.mediaId, media.id))
+        .where(and(kindCondition, cursorCondition))
+        .orderBy(desc(latestWatched.watchedAt), desc(media.id))
+        .limit(limit + 1),
+      db
+        .select({ total: countDistinct(watchEvents.mediaId) })
+        .from(watchEvents)
+        .innerJoin(media, eq(watchEvents.mediaId, media.id))
+        .where(and(eq(watchEvents.userId, user.id), kindCondition)),
+    ]);
+    const hasMore = rows.length > limit;
+    const items = rows.slice(0, limit);
+    const lastItem = items.at(-1);
     return c.json({
-      items: rows.filter(({ item }) => {
-        if (seen.has(item.id)) return false;
-        seen.add(item.id);
-        return true;
-      }),
+      items,
+      total: totals[0]?.total ?? 0,
+      nextCursor:
+        hasMore && lastItem ? { watchedAt: lastItem.watchedAt, itemId: lastItem.item.id } : null,
     });
   },
 );

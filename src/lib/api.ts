@@ -2,6 +2,8 @@ import type {
   ApiError,
   DashboardResponse,
   MediaDetailResponse,
+  MediaKind,
+  MediaRecord,
   SearchResult,
   WatchEventWithShow,
 } from '../../shared/types';
@@ -20,6 +22,20 @@ type RetryOptions = {
   maxAttempts?: number;
   baseDelayMs?: number;
   onRetry?: (attempt: number, delayMs: number, error: ApiRequestError) => void;
+};
+
+export type WatchedLibraryCursor = { watchedAt: string; itemId: string };
+
+export type WatchedLibraryPage = {
+  items: Array<{ item: MediaRecord; watchedAt: string }>;
+  total: number;
+  nextCursor: WatchedLibraryCursor | null;
+};
+
+export type WatchlistPage = {
+  items: Array<{ item: MediaRecord; addedAt: string; entryId: string }>;
+  total: number;
+  nextCursor: WatchedLibraryCursor | null;
 };
 
 function retryable(error: unknown): error is ApiRequestError {
@@ -94,20 +110,32 @@ export async function apiWithRetry<T>(
 
 export const queries = {
   dashboard: () => api<DashboardResponse>('/api/dashboard'),
-  search: (query: string) =>
+  search: (query: string, page = 1) =>
     api<{ results: SearchResult[]; page: number; totalPages: number }>(
-      `/api/search?q=${encodeURIComponent(query)}`,
+      `/api/search?q=${encodeURIComponent(query)}&page=${page}`,
     ),
   media: (kind: string, id: string) => api<MediaDetailResponse>(`/api/media/${kind}/${id}`),
-  history: () => api<{ items: WatchEventWithShow[]; nextCursor: string | null }>('/api/history'),
-  watchlist: () =>
-    api<{
-      items: Array<{ item: MediaDetailResponse['media']; addedAt: string }>;
-    }>('/api/library?filter=watchlist'),
-  watchedLibrary: () =>
-    api<{
-      items: Array<{ item: MediaDetailResponse['media']; watchedAt: string }>;
-    }>('/api/library?filter=watched'),
+  history: (cursor?: string | null) =>
+    api<{ items: WatchEventWithShow[]; nextCursor: string | null }>(
+      `/api/history${cursor ? `?cursor=${encodeURIComponent(cursor)}` : ''}`,
+    ),
+  watchlist: (cursor?: WatchedLibraryCursor | null) => {
+    const params = new URLSearchParams({ filter: 'watchlist', limit: '60' });
+    if (cursor) {
+      params.set('before', cursor.watchedAt);
+      params.set('beforeId', cursor.itemId);
+    }
+    return api<WatchlistPage>(`/api/library?${params}`);
+  },
+  watchedLibrary: (kind?: MediaKind, cursor?: WatchedLibraryCursor | null) => {
+    const params = new URLSearchParams({ filter: 'watched', limit: '60' });
+    if (kind) params.set('kind', kind);
+    if (cursor) {
+      params.set('before', cursor.watchedAt);
+      params.set('beforeId', cursor.itemId);
+    }
+    return api<WatchedLibraryPage>(`/api/library?${params}`);
+  },
 };
 
 export function json(method: 'POST' | 'PUT' | 'DELETE', body?: unknown): RequestInit {

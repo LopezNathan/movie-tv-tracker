@@ -8,14 +8,16 @@ import { queries } from '../lib/api';
 export function SearchPage() {
   const [input, setInput] = useState('');
   const [query, setQuery] = useState('');
+  const [page, setPage] = useState(1);
   const results = useQuery({
-    queryKey: ['search', query],
-    queryFn: () => queries.search(query),
+    queryKey: ['search', query, page],
+    queryFn: () => queries.search(query, page),
     enabled: query.length >= 2,
   });
 
   function submit(event: FormEvent) {
     event.preventDefault();
+    setPage(1);
     setQuery(input.trim());
   }
 
@@ -46,15 +48,38 @@ export function SearchPage() {
       {results.error && <ErrorState error={results.error} retry={() => results.refetch()} />}
       {results.data &&
         (results.data.results.length ? (
-          <section className="poster-grid search-results" aria-label="Search results">
-            {results.data.results.map((item) => (
-              <MediaCard
-                key={`${item.kind}-${item.tmdbId}`}
-                item={item}
-                note={item.kind === 'show' ? 'Series' : 'Movie'}
-              />
-            ))}
-          </section>
+          <>
+            <section className="poster-grid search-results" aria-label="Search results">
+              {results.data.results.map((item) => (
+                <MediaCard
+                  key={`${item.kind}-${item.tmdbId}`}
+                  item={item}
+                  note={item.kind === 'show' ? 'Series' : 'Movie'}
+                />
+              ))}
+            </section>
+            {results.data.totalPages > 1 && (
+              <div className="library-more search-pagination">
+                <button
+                  className="button subtle"
+                  disabled={page === 1}
+                  onClick={() => setPage(page - 1)}
+                >
+                  Previous
+                </button>
+                <span>
+                  Page {results.data.page} of {results.data.totalPages}
+                </span>
+                <button
+                  className="button subtle"
+                  disabled={page === results.data.totalPages}
+                  onClick={() => setPage(page + 1)}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
         ) : (
           <EmptyState title="No exact match">
             Try a shorter title, alternate spelling, or original-language name.

@@ -182,6 +182,65 @@ describe('tracker API with local D1', () => {
     expect(emptyWatchlist.items).toHaveLength(0);
   });
 
+  it('pages a distinct watched library by each title’s latest watch event', async () => {
+    await request('/api/me');
+    const movieOne = '00000000-0000-4000-8000-000000000001';
+    const showOne = '00000000-0000-4000-8000-000000000002';
+    const movieTwo = '00000000-0000-4000-8000-000000000003';
+    await seedMedia(harness.database, { id: movieOne, kind: 'movie', tmdbId: 1, title: 'First' });
+    await seedMedia(harness.database, { id: showOne, kind: 'show', tmdbId: 2, title: 'Second' });
+    await seedMedia(harness.database, { id: movieTwo, kind: 'movie', tmdbId: 3, title: 'Third' });
+    const userId = 'dev:owner@example.test';
+    const events = [
+      ['event-1', movieOne, '2026-01-01T00:00:00.000Z'],
+      ['event-2', movieOne, '2026-01-04T00:00:00.000Z'],
+      ['event-3', showOne, '2026-01-03T00:00:00.000Z'],
+      ['event-4', movieTwo, '2026-01-02T00:00:00.000Z'],
+    ];
+    for (const [id, mediaId, watchedAt] of events) {
+      await harness.database
+        .prepare(
+          `INSERT INTO watch_events (id, user_id, media_id, watched_at, source, created_at)
+           VALUES (?, ?, ?, ?, 'manual', ?)`,
+        )
+        .bind(id, userId, mediaId, watchedAt, watchedAt)
+        .run();
+    }
+
+    const first = await (
+      await request('/api/library?filter=watched&limit=2')
+    ).json<{
+      items: Array<{ item: { id: string }; watchedAt: string }>;
+      total: number;
+      nextCursor: { watchedAt: string; itemId: string } | null;
+    }>();
+    expect(first.total).toBe(3);
+    expect(first.items.map(({ item, watchedAt }) => ({ id: item.id, watchedAt }))).toEqual([
+      { id: movieOne, watchedAt: '2026-01-04T00:00:00.000Z' },
+      { id: showOne, watchedAt: '2026-01-03T00:00:00.000Z' },
+    ]);
+    expect(first.nextCursor).toEqual({ watchedAt: '2026-01-03T00:00:00.000Z', itemId: showOne });
+
+    const second = await (
+      await request(
+        `/api/library?filter=watched&limit=2&before=${encodeURIComponent(first.nextCursor!.watchedAt)}&beforeId=${first.nextCursor!.itemId}`,
+      )
+    ).json<{
+      items: Array<{ item: { id: string }; watchedAt: string }>;
+      nextCursor: unknown;
+    }>();
+    expect(second.items.map(({ item, watchedAt }) => ({ id: item.id, watchedAt }))).toEqual([
+      { id: movieTwo, watchedAt: '2026-01-02T00:00:00.000Z' },
+    ]);
+    expect(second.nextCursor).toBeNull();
+
+    const movies = await (
+      await request('/api/library?filter=watched&kind=movie&limit=2')
+    ).json<{ items: Array<{ item: { id: string } }>; total: number }>();
+    expect(movies.total).toBe(2);
+    expect(movies.items.map(({ item }) => item.id)).toEqual([movieOne, movieTwo]);
+  });
+
   it('bulk marks only aired, not-yet-watched episodes', async () => {
     await request('/api/health');
     await seedMedia(harness.database, { id: 'show-1', kind: 'show', tmdbId: 10, title: 'Show' });
@@ -460,5 +519,4 @@ describe('tracker API with local D1', () => {
     expect(episode?.title).toBe('New episode');
     expect(episode?.posterPath).toBe('/season-one.jpg');
   });
-
 });
