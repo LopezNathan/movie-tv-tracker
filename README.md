@@ -1,40 +1,56 @@
 # Scene
 
-A private, installable movie and television tracker. Scene keeps watch history, ratings, watchlists, and episode progress in a Cloudflare D1 database and uses TMDB for catalog metadata.
+Scene is an installable movie and TV tracker for keeping a personal record of what you watch, what you want to watch next, and how far you are through each series.
 
 ![Scene dashboard](public/scene-dashboard.png)
 
+## Features
+
+- Search movies and television shows using TMDB catalog data.
+- Mark movies and individual episodes as watched, including a custom watch date.
+- Track episode progress by season, or mark a season and earlier episodes watched in one action.
+- Rate titles from 1 to 10 and maintain a watchlist.
+- Browse a chronological watch history and a filterable library of watched movies, shows, and episodes.
+- See recently watched titles, watchlist picks, statistics, and the next aired episode for in-progress shows on the dashboard.
+- Import watch history, ratings, and watchlist items from a Trakt account-export ZIP; unmatched records remain available for review.
+- Download a versioned JSON backup of your library, watches, ratings, and watchlist.
+- Install as a PWA with offline access to the app shell, recently viewed pages, and artwork.
+
+## Stack
+
+React and Vite power the client; a Cloudflare Worker with D1 stores tracker data. TMDB supplies movie and television metadata. The project also supports self-hosting with Docker.
+
 ## Requirements
 
-- Node.js 26.8.2 or newer (see `.nvmrc`)
+- Node.js 26 or newer (see `.nvmrc`)
 - npm 12 or newer
-- A free Cloudflare account for production
 - A TMDB API read-access token
+- A Cloudflare account when deploying to Workers
 
-## Local development
+## Get started
 
 ```sh
 npm ci
 cp .dev.vars.example .dev.vars
-# Add your TMDB token and email to .dev.vars
+# Add your TMDB token and development email to .dev.vars
 npm run db:migrate:local
 npm run dev
 ```
 
-The local app is available at `http://localhost:5173`. The development identity override is accepted only when `ENVIRONMENT=development`.
+Open `http://localhost:5173`. The development identity override only works when `ENVIRONMENT=development`.
 
-## Commands
+## Scripts
 
 ```sh
-npm run dev          # local Cloudflare/Vite runtime
-npm run build        # type-check and production build
-npm run lint         # static analysis
-npm run test         # unit and integration tests
-npm run test:e2e     # Playwright browser tests
-npm run check        # all non-browser verification
+npm run dev              # start the local Vite/Cloudflare runtime
+npm run build            # type-check and create a production build
+npm run lint             # run static analysis
+npm run test             # run unit and API integration tests
+npm run test:e2e         # run Playwright browser tests
+npm run check            # run formatting, linting, types, tests, and build
 ```
 
-For the complete verification suite on a fresh clone:
+To run the complete verification suite on a fresh clone:
 
 ```sh
 npx playwright install chromium
@@ -42,22 +58,10 @@ npm run check
 npm run test:e2e
 ```
 
-Vitest runs unit tests plus API integration tests against isolated Miniflare D1 databases. Playwright starts the local Worker and covers the primary desktop and mobile navigation journeys.
+## Deploy
 
-## Production
+Choose the deployment path that fits your setup:
 
-Two deployment paths are supported:
-
-- [Cloudflare Workers](./DEPLOYMENT.md) with hosted D1 and Cloudflare Access.
-- [Docker with Tailscale](./DOCKER.md) with persistent local D1 storage and private tailnet access.
-- [Docker with Cloudflare Tunnel](./CLOUDFLARE.md) with persistent local D1 storage, a custom hostname, and Cloudflare Access.
-
-No live resources are provisioned by this repository.
-
-## Offline behavior
-
-Scene precaches its application shell and keeps recently read dashboard, history, watchlist, media details, and artwork available offline. Search, imports, and all writes stay online-only; a failed write is never queued for later. Clear device-local caches from Settings at any time.
-
-## Privacy
-
-The production Worker is designed to sit behind Cloudflare Access. Secrets, local databases, build output, and personal exports are excluded from Git.
+- [Cloudflare Workers](./DEPLOYMENT.md) for hosted D1 and Cloudflare Access.
+- [Docker with Tailscale](./DOCKER.md) for a private tailnet deployment with local D1 storage.
+- [Docker with Cloudflare Tunnel](./CLOUDFLARE.md) for a custom hostname, Cloudflare Access, and local D1 storage.
