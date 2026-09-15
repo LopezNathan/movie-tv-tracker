@@ -322,7 +322,7 @@ app.get(
     'query',
     z
       .object({
-        filter: z.enum(['watchlist', 'watched', 'rated']).default('watchlist'),
+        filter: z.enum(['watchlist', 'watched', 'rated', 'hidden']).default('watchlist'),
         kind: z.enum(['movie', 'show', 'episode']).optional(),
         before: isoTimestamp.optional(),
         beforeId: z.string().uuid().optional(),
@@ -381,6 +381,38 @@ app.get(
         .where(eq(ratings.userId, user.id))
         .orderBy(desc(ratings.ratedAt));
       return c.json({ items: rows });
+    }
+    if (filter === 'hidden') {
+      const cursorCondition =
+        before && beforeId
+          ? or(
+              lt(upNextExclusions.hiddenAt, before),
+              and(eq(upNextExclusions.hiddenAt, before), lt(upNextExclusions.showId, beforeId)),
+            )
+          : undefined;
+      const [rows, totals] = await Promise.all([
+        db
+          .select({ item: media, hiddenAt: upNextExclusions.hiddenAt })
+          .from(upNextExclusions)
+          .innerJoin(media, eq(upNextExclusions.showId, media.id))
+          .where(and(eq(upNextExclusions.userId, user.id), cursorCondition))
+          .orderBy(desc(upNextExclusions.hiddenAt), desc(upNextExclusions.showId))
+          .limit(limit + 1),
+        db
+          .select({ total: countDistinct(upNextExclusions.showId) })
+          .from(upNextExclusions)
+          .where(eq(upNextExclusions.userId, user.id)),
+      ]);
+      const items = rows.slice(0, limit);
+      const lastItem = items.at(-1);
+      return c.json({
+        items,
+        total: totals[0]?.total ?? 0,
+        nextCursor:
+          rows.length > limit && lastItem
+            ? { watchedAt: lastItem.hiddenAt, itemId: lastItem.item.id }
+            : null,
+      });
     }
     const latestWatched = db.$with('latest_watched').as(
       db

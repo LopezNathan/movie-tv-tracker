@@ -5,21 +5,25 @@ import { EmptyState, ErrorState, LoadingState } from '../components/async-state'
 import { MediaCard } from '../components/media-card';
 import { queries, type WatchedLibraryCursor } from '../lib/api';
 
-type LibraryFilter = 'all' | 'movie' | 'show' | 'episode';
+type LibraryFilter = 'all' | 'movie' | 'show' | 'episode' | 'hidden';
 
 const filters: Array<{ value: LibraryFilter; label: string }> = [
   { value: 'all', label: 'Everything' },
   { value: 'movie', label: 'Movies' },
   { value: 'show', label: 'Shows' },
   { value: 'episode', label: 'Episodes' },
+  { value: 'hidden', label: 'Hidden' },
 ];
 
 export function LibraryPage() {
   const [filter, setFilter] = useState<LibraryFilter>('all');
-  const kind = filter === 'all' ? undefined : filter;
+  const kind = filter === 'all' || filter === 'hidden' ? undefined : filter;
   const library = useInfiniteQuery({
-    queryKey: ['library', 'watched', kind],
-    queryFn: ({ pageParam }) => queries.watchedLibrary(kind, pageParam),
+    queryKey: ['library', filter, kind],
+    queryFn: ({ pageParam }) =>
+      filter === 'hidden'
+        ? queries.hiddenShows(pageParam)
+        : queries.watchedLibrary(kind, pageParam),
     initialPageParam: null as WatchedLibraryCursor | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
   });
@@ -37,15 +41,17 @@ export function LibraryPage() {
     <div className="page-stack wide">
       <header>
         <p className="eyebrow">Already seen</p>
-        <h1>Watched library.</h1>
+        <h1>{filter === 'hidden' ? 'Hidden shows.' : 'Watched library.'}</h1>
         <p className="lede">
-          Every distinct movie, show, and episode you&apos;ve watched — newest first.
+          {filter === 'hidden'
+            ? 'Shows hidden from Up Next — most recently hidden first.'
+            : "Every distinct movie, show, and episode you've watched — newest first."}
         </p>
       </header>
 
       {total ? (
         <>
-          <div className="library-toolbar" aria-label="Filter watched library">
+          <div className="library-toolbar" aria-label="Filter library">
             <span className="library-count">
               {total} title{total === 1 ? '' : 's'}
             </span>
@@ -66,13 +72,19 @@ export function LibraryPage() {
           {items.length ? (
             <>
               <div className="poster-grid">
-                {items.map(({ item, watchedAt }) => (
+                {items.map(({ item, watchedAt, hiddenAt }) => (
                   <MediaCard
                     key={item.id}
                     item={item}
-                    note={`Last watched ${new Intl.DateTimeFormat(undefined, {
-                      dateStyle: 'medium',
-                    }).format(new Date(watchedAt))}`}
+                    note={
+                      hiddenAt
+                        ? `Hidden ${new Intl.DateTimeFormat(undefined, {
+                            dateStyle: 'medium',
+                          }).format(new Date(hiddenAt))}`
+                        : `Last watched ${new Intl.DateTimeFormat(undefined, {
+                            dateStyle: 'medium',
+                          }).format(new Date(watchedAt!))}`
+                    }
                   />
                 ))}
               </div>
@@ -90,14 +102,26 @@ export function LibraryPage() {
               )}
             </>
           ) : (
-            <EmptyState title={`No ${filter}s watched yet`}>
-              Try another filter to see more of your library.
+            <EmptyState
+              title={filter === 'hidden' ? 'No hidden shows' : `No ${filter}s watched yet`}
+            >
+              {filter === 'hidden'
+                ? 'Hide a show from its detail page to keep it out of Up Next.'
+                : 'Try another filter to see more of your library.'}
             </EmptyState>
           )}
         </>
       ) : (
-        <EmptyState title="Your watched library is waiting">
-          <Link to="/search">Find something to watch</Link> and mark it watched to add it here.
+        <EmptyState
+          title={filter === 'hidden' ? 'No hidden shows' : 'Your watched library is waiting'}
+        >
+          {filter === 'hidden' ? (
+            'Hide a show from its detail page to keep it out of Up Next.'
+          ) : (
+            <>
+              <Link to="/search">Find something to watch</Link> and mark it watched to add it here.
+            </>
+          )}
         </EmptyState>
       )}
     </div>

@@ -241,6 +241,39 @@ describe('tracker API with local D1', () => {
     expect(movies.items.map(({ item }) => item.id)).toEqual([movieOne, movieTwo]);
   });
 
+  it('lists hidden shows in the library by when they were hidden', async () => {
+    await request('/api/me');
+    const olderShow = '00000000-0000-4000-8000-000000000011';
+    const newerShow = '00000000-0000-4000-8000-000000000012';
+    await seedMedia(harness.database, { id: olderShow, kind: 'show', tmdbId: 11, title: 'Older' });
+    await seedMedia(harness.database, { id: newerShow, kind: 'show', tmdbId: 12, title: 'Newer' });
+    await harness.database
+      .prepare(
+        `INSERT INTO up_next_exclusions (id, user_id, show_id, hidden_at) VALUES (?, ?, ?, ?), (?, ?, ?, ?)`,
+      )
+      .bind(
+        '00000000-0000-4000-8000-000000000021',
+        'dev:owner@example.test',
+        olderShow,
+        '2026-01-01T00:00:00.000Z',
+        '00000000-0000-4000-8000-000000000022',
+        'dev:owner@example.test',
+        newerShow,
+        '2026-02-01T00:00:00.000Z',
+      )
+      .run();
+
+    const library = await (
+      await request('/api/library?filter=hidden')
+    ).json<{ items: Array<{ item: { id: string }; hiddenAt: string }>; total: number }>();
+
+    expect(library.total).toBe(2);
+    expect(library.items).toEqual([
+      { item: expect.objectContaining({ id: newerShow }), hiddenAt: '2026-02-01T00:00:00.000Z' },
+      { item: expect.objectContaining({ id: olderShow }), hiddenAt: '2026-01-01T00:00:00.000Z' },
+    ]);
+  });
+
   it('bulk marks only aired, not-yet-watched episodes', async () => {
     await request('/api/health');
     await seedMedia(harness.database, { id: 'show-1', kind: 'show', tmdbId: 10, title: 'Show' });
