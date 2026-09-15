@@ -26,11 +26,15 @@ type RetryOptions = {
 
 export type WatchedLibraryCursor = { watchedAt: string; itemId: string };
 
-export type WatchedLibraryPage = {
-  items: Array<{ item: MediaRecord; watchedAt: string }>;
+export type LibraryPage = {
+  items: Array<{ item: MediaRecord; watchedAt?: string; hiddenAt?: string }>;
   total: number;
   nextCursor: WatchedLibraryCursor | null;
 };
+
+export type WatchedLibraryPage = LibraryPage;
+
+export type HiddenShowsPage = LibraryPage;
 
 export type WatchlistPage = {
   items: Array<{ item: MediaRecord; addedAt: string; entryId: string }>;
@@ -135,6 +139,14 @@ export const queries = {
       params.set('beforeId', cursor.itemId);
     }
     return api<WatchedLibraryPage>(`/api/library?${params}`);
+  },
+  hiddenShows: (cursor?: WatchedLibraryCursor | null) => {
+    const params = new URLSearchParams({ filter: 'hidden', limit: '60' });
+    if (cursor) {
+      params.set('before', cursor.watchedAt);
+      params.set('beforeId', cursor.itemId);
+    }
+    return api<HiddenShowsPage>(`/api/library?${params}`);
   },
 };
 
