@@ -29,6 +29,18 @@ import { getTmdbSeason, searchTmdb, TmdbError } from './lib/tmdb';
 const app = new Hono<AppEnv>();
 const seasonPosterCache = new Map<string, string | null>();
 
+async function getSeasonPoster(env: AppEnv['Bindings'], show: MediaRecord, seasonNumber: number) {
+  const key = `${show.id}:${seasonNumber}`;
+  if (seasonPosterCache.has(key)) return seasonPosterCache.get(key) ?? null;
+  try {
+    const posterPath = (await getTmdbSeason(env, show.tmdbId, seasonNumber)).poster_path ?? null;
+    seasonPosterCache.set(key, posterPath);
+    return posterPath;
+  } catch {
+    return null;
+  }
+}
+
 const isoTimestamp = z.string().datetime({ offset: true });
 const kindParam = z.object({
   kind: z.enum(['movie', 'show']),
@@ -288,15 +300,7 @@ app.get(
     const seasonPosters = new Map(
       await Promise.all(
         [...seasons.entries()].map(async ([key, { show, seasonNumber }]) => {
-          if (seasonPosterCache.has(key)) return [key, seasonPosterCache.get(key)] as const;
-          try {
-            const season = await getTmdbSeason(c.env, show.tmdbId, seasonNumber);
-            const posterPath = season.poster_path ?? null;
-            seasonPosterCache.set(key, posterPath);
-            return [key, posterPath] as const;
-          } catch {
-            return [key, null] as const;
-          }
+          return [key, await getSeasonPoster(c.env, show, seasonNumber)] as const;
         }),
       ),
     );
@@ -414,8 +418,47 @@ app.get(
     const hasMore = rows.length > limit;
     const items = rows.slice(0, limit);
     const lastItem = items.at(-1);
+    const seriesIds = [
+      ...new Set(
+        items.flatMap((row) =>
+          row.item.kind === 'episode' && row.item.seriesId ? [row.item.seriesId] : [],
+        ),
+      ),
+    ];
+    const showRows = seriesIds.length
+      ? await db.select().from(media).where(inArray(media.id, seriesIds))
+      : [];
+    const showsById = new Map(showRows.map((show) => [show.id, show as MediaRecord]));
+    const seasons = new Map<string, { show: MediaRecord; seasonNumber: number }>();
+    for (const row of items) {
+      const show = row.item.seriesId ? showsById.get(row.item.seriesId) : undefined;
+      if (row.item.kind === 'episode' && show && row.item.seasonNumber !== null) {
+        seasons.set(`${show.id}:${row.item.seasonNumber}`, {
+          show,
+          seasonNumber: row.item.seasonNumber,
+        });
+      }
+    }
+    const seasonPosters = new Map(
+      await Promise.all(
+        [...seasons.entries()].map(async ([key, { show, seasonNumber }]) => {
+          return [key, await getSeasonPoster(c.env, show, seasonNumber)] as const;
+        }),
+      ),
+    );
     return c.json({
-      items,
+      items: items.map((row) => {
+        if (row.item.kind !== 'episode') return row;
+        const show = row.item.seriesId ? showsById.get(row.item.seriesId) : undefined;
+        const seasonPoster =
+          show && row.item.seasonNumber !== null
+            ? seasonPosters.get(`${show.id}:${row.item.seasonNumber}`)
+            : null;
+        return {
+          ...row,
+          item: { ...row.item, posterPath: seasonPoster ?? show?.posterPath ?? null },
+        };
+      }),
       total: totals[0]?.total ?? 0,
       nextCursor:
         hasMore && lastItem ? { watchedAt: lastItem.watchedAt, itemId: lastItem.item.id } : null,

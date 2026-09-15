@@ -519,4 +519,42 @@ describe('tracker API with local D1', () => {
     expect(episode?.title).toBe('New episode');
     expect(episode?.posterPath).toBe('/season-one.jpg');
   });
+
+  it('uses season artwork for an existing episode in the watched library', async () => {
+    await request('/api/health');
+    await seedMedia(harness.database, {
+      id: 'show-1',
+      kind: 'show',
+      tmdbId: 50,
+      title: 'Show',
+      posterPath: '/show-poster.jpg',
+    });
+    await seedMedia(harness.database, {
+      id: 'episode-1',
+      kind: 'episode',
+      tmdbId: 501,
+      title: 'Episode',
+      posterPath: '/legacy-episode-still.jpg',
+      seriesId: 'show-1',
+      seasonNumber: 1,
+      episodeNumber: 1,
+    });
+    await request('/api/watch-events', body('POST', { mediaId: 'episode-1' }));
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        async () =>
+          new Response(JSON.stringify({ poster_path: '/season-one.jpg', episodes: [] }), {
+            status: 200,
+            headers: { 'Content-Type': 'application/json' },
+          }),
+      ),
+    );
+
+    const library = await (
+      await request('/api/library?filter=watched')
+    ).json<{ items: Array<{ item: { posterPath: string | null } }> }>();
+
+    expect(library.items[0]?.item.posterPath).toBe('/season-one.jpg');
+  });
 });
