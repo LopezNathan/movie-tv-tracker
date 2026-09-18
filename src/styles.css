@@ -205,7 +205,8 @@ button {
   bottom: max(0.75rem, env(safe-area-inset-bottom));
   left: 0.75rem;
   display: grid;
-  grid-template-columns: repeat(7, minmax(0, 1fr));
+  /* Match the five primary routes so every item shares the whole bar. */
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   padding: 0.38rem;
   border: 1px solid var(--line-bright);
   background: color-mix(in srgb, #171712 94%, transparent);
