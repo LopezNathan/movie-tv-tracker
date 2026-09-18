@@ -120,6 +120,45 @@ export const upNextExclusions = sqliteTable(
   (table) => [uniqueIndex('up_next_exclusions_user_show_unique').on(table.userId, table.showId)],
 );
 
+/** Short-lived handoff credentials produced only after Cloudflare Access succeeds. */
+export const mobilePairingCodes = sqliteTable(
+  'mobile_pairing_codes',
+  {
+    id: text('id').primaryKey(),
+    codeHash: text('code_hash').notNull(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    expiresAt: text('expires_at').notNull(),
+    consumedAt: text('consumed_at'),
+    createdAt: text('created_at').notNull(),
+  },
+  (table) => [uniqueIndex('mobile_pairing_codes_hash_unique').on(table.codeHash)],
+);
+
+/** Opaque mobile credentials. Only SHA-256 digests are persisted in D1. */
+export const mobileSessions = sqliteTable(
+  'mobile_sessions',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    accessTokenHash: text('access_token_hash').notNull(),
+    refreshTokenHash: text('refresh_token_hash').notNull(),
+    accessExpiresAt: text('access_expires_at').notNull(),
+    refreshExpiresAt: text('refresh_expires_at').notNull(),
+    revokedAt: text('revoked_at'),
+    createdAt: text('created_at').notNull(),
+    lastUsedAt: text('last_used_at').notNull(),
+  },
+  (table) => [
+    uniqueIndex('mobile_sessions_access_hash_unique').on(table.accessTokenHash),
+    uniqueIndex('mobile_sessions_refresh_hash_unique').on(table.refreshTokenHash),
+    index('mobile_sessions_user_idx').on(table.userId),
+  ],
+);
+
 export const importRuns = sqliteTable(
   'import_runs',
   {

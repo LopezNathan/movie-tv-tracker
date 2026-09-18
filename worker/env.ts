@@ -13,6 +13,8 @@ export type Bindings = {
   CF_ACCESS_TEAM_DOMAIN?: string;
   CF_ACCESS_AUD?: string;
   CF_ACCESS_JWKS_B64?: string;
+  /** Hostname intentionally excluded from Cloudflare Access, e.g. api.scene.nathanlopez.com. */
+  MOBILE_API_HOST?: string;
 };
 
 export type Variables = {

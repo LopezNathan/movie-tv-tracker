@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 import { Clapperboard, Clock3, Download, Home, Library, Search, Settings } from 'lucide-react';
-import { NavLink, Navigate, Route, Routes } from 'react-router-dom';
+import { NavLink, Navigate, Route, Routes, useLocation } from 'react-router-dom';
 import { OfflineBanner } from './components/connectivity';
 import { DashboardPage } from './pages/dashboard';
 import { HistoryPage } from './pages/history';
@@ -10,6 +10,7 @@ import { MediaDetailPage } from './pages/media-detail';
 import { SearchPage } from './pages/search';
 import { SettingsPage } from './pages/settings';
 import { WatchlistPage } from './pages/watchlist';
+import { PairingPage } from './pages/pairing';
 import { queries } from './lib/api';
 
 const routes = [
@@ -23,6 +24,8 @@ const routes = [
 ];
 
 export function App() {
+  const location = useLocation();
+  if (location.pathname === '/pair') return <PairingPage />;
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: queries.dashboard });
   const stats = dashboard.data?.stats;
 

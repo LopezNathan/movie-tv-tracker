@@ -15,12 +15,19 @@ import {
   importRuns,
   listEntries,
   media,
+  mobileSessions,
   ratings,
   upNextExclusions,
   watchEvents,
 } from './db/schema';
 import type { AppEnv } from './env';
-import { requireUser } from './lib/auth';
+import {
+  createPairingCode,
+  exchangePairingCode,
+  requireUser,
+  rotateMobileSession,
+  tokenHash,
+} from './lib/auth';
 import { processImportBatch } from './lib/import-service';
 import { ensureMedia } from './lib/media-service';
 import { calculateProgress } from './lib/progress';
@@ -92,7 +99,74 @@ async function getWatchedIds(db: ReturnType<typeof drizzle>, userId: string) {
 }
 
 app.get('/api/health', (c) => c.json({ ok: true, environment: c.env.ENVIRONMENT }));
+
+function requireMobileHost(c: { req: { url: string }; env: AppEnv['Bindings'] }) {
+  const expected = c.env.MOBILE_API_HOST?.toLowerCase();
+  if (!expected || new URL(c.req.url).hostname.toLowerCase() !== expected) {
+    throw new HTTPException(404, { message: 'Not found.' });
+  }
+}
+
+function requireBrowserHost(c: { req: { url: string }; env: AppEnv['Bindings'] }) {
+  const mobileHost = c.env.MOBILE_API_HOST?.toLowerCase();
+  if (mobileHost && new URL(c.req.url).hostname.toLowerCase() === mobileHost) {
+    throw new HTTPException(404, { message: 'Not found.' });
+  }
+}
+
+// This endpoint stays on the Access-protected browser host. The app opens it in
+// ASWebAuthenticationSession, then receives only a short-lived, single-use code.
+app.get('/api/mobile/pair', requireUser, async (c) => {
+  const callback = c.req.query('callback');
+  const state = c.req.query('state');
+  if (!callback || !state) throw new HTTPException(400, { message: 'A callback and state are required.' });
+  let callbackUrl: URL;
+  try {
+    callbackUrl = new URL(callback);
+  } catch {
+    throw new HTTPException(400, { message: 'Invalid callback URL.' });
+  }
+  if (callbackUrl.protocol !== 'scene:' || callbackUrl.host !== 'auth') {
+    throw new HTTPException(400, { message: 'Unsupported callback URL.' });
+  }
+  callbackUrl.searchParams.set('code', await createPairingCode(drizzle(c.env.DB), c.get('user').id));
+  callbackUrl.searchParams.set('state', state);
+  return c.redirect(callbackUrl.toString(), 302);
+});
+
+// The browser pairing page uses this instead of a navigation to an /api route.
+// That avoids installed PWA service workers treating the Access return as an
+// app-shell navigation. It remains protected by Cloudflare Access on the web host.
+app.post('/api/mobile/pair-code', requireUser, async (c) => {
+  requireBrowserHost(c);
+  return c.json({ code: await createPairingCode(drizzle(c.env.DB), c.get('user').id) });
+});
+
+app.post('/api/mobile/sessions/exchange', zValidator('json', z.object({ code: z.string().min(20) })), async (c) => {
+  requireMobileHost(c);
+  const tokens = await exchangePairingCode(drizzle(c.env.DB), c.req.valid('json').code);
+  if (!tokens) throw new HTTPException(401, { message: 'This pairing code is invalid, expired, or already used.' });
+  return c.json(tokens, 201);
+});
+
+app.post('/api/mobile/sessions/refresh', zValidator('json', z.object({ refreshToken: z.string().min(20) })), async (c) => {
+  requireMobileHost(c);
+  const tokens = await rotateMobileSession(drizzle(c.env.DB), c.req.valid('json').refreshToken);
+  if (!tokens) throw new HTTPException(401, { message: 'This refresh token is invalid, expired, or already used.' });
+  return c.json(tokens);
+});
 app.use('/api/*', requireUser);
+
+app.delete('/api/mobile/sessions/current', async (c) => {
+  requireMobileHost(c);
+  const bearer = c.req.header('Authorization')?.match(/^Bearer +(.+)$/i)?.[1];
+  if (!bearer) throw new HTTPException(401, { message: 'A mobile session is required.' });
+  await drizzle(c.env.DB)
+    .update(mobileSessions)
+    .set({ revokedAt: new Date().toISOString() })
+    .where(eq(mobileSessions.accessTokenHash, await tokenHash(bearer)));
+  return c.body(null, 204);
+});
 
 app.get('/api/me', (c) => c.json({ user: c.get('user') }));
 

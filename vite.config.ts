@@ -45,6 +45,9 @@ export default defineConfig({
       workbox: {
         cleanupOutdatedCaches: true,
         navigateFallback: '/index.html',
+        // Access returns the pairing browser to an API navigation. It must reach
+        // the Worker (and its scene:// redirect), never the SPA shell.
+        navigateFallbackDenylist: [/^\/api\//],
         globPatterns: ['**/*.{js,css,html,woff2}'],
         runtimeCaching: [
           {

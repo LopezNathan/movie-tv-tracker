@@ -65,3 +65,11 @@ Choose the deployment path that fits your setup:
 - [Cloudflare Workers](./DEPLOYMENT.md) for hosted D1 and Cloudflare Access.
 - [Docker with Tailscale](./DOCKER.md) for a private tailnet deployment with local D1 storage.
 - [Docker with Cloudflare Tunnel](./CLOUDFLARE.md) for a custom hostname, Cloudflare Access, and local D1 storage.
+
+## iPhone companion
+
+The native iOS 17+ companion lives in [ios/Scene](./ios/Scene). Open `Scene.xcodeproj` in Xcode, select your private TestFlight signing team, and archive the `Scene` scheme.
+
+Before distributing, deploy migration `0003_mobile_sessions.sql`, point `api.scene.nathanlopez.com` at this same Worker, and set `MOBILE_API_HOST=api.scene.nathanlopez.com`. Keep Cloudflare Access on `scene.nathanlopez.com` only: the API hostname must be outside Access. The app opens the protected browser host to pair, then uses a five-minute single-use handoff code to obtain revocable opaque bearer credentials. Access and refresh tokens are never stored in D1, only SHA-256 digests; the app stores the credential pair in Keychain.
+
+The app caches successful reads locally for offline viewing and identifies stale content. It intentionally never queues writes while offline.

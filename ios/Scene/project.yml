@@ -1,0 +1,51 @@
+name: Scene
+options:
+  bundleIdPrefix: com.nathanlopez
+settings:
+  base:
+    IPHONEOS_DEPLOYMENT_TARGET: 17.0
+    SWIFT_VERSION: 5.0
+targets:
+  Scene:
+    type: application
+    platform: iOS
+    sources: [Scene]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nathanlopez.scene
+        INFOPLIST_KEY_CFBundleDisplayName: Scene
+        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: UIInterfaceOrientationPortrait
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        MARKETING_VERSION: 1.0
+        CURRENT_PROJECT_VERSION: 1
+    info:
+      path: Scene/Info.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.nathanlopez.scene.auth
+            CFBundleURLSchemes: [scene]
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: false
+  SceneTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources: [SceneTests]
+    dependencies: [{target: Scene}]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nathanlopez.scene.tests
+  SceneUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources: [SceneUITests]
+    dependencies: [{target: Scene}]
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.nathanlopez.scene.uitests
+schemes:
+  Scene:
+    build:
+      targets: {Scene: all, SceneTests: [test], SceneUITests: [test]}
+    test:
+      targets: [SceneTests, SceneUITests]

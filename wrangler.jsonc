@@ -9,6 +9,10 @@
       "pattern": "scene.nathanlopez.com",
       "custom_domain": true,
     },
+    {
+      "pattern": "api.scene.nathanlopez.com",
+      "custom_domain": true,
+    },
   ],
   "compatibility_date": "2026-09-07",
   "compatibility_flags": ["nodejs_compat"],
@@ -30,5 +34,6 @@
     "ENVIRONMENT": "production",
     "CF_ACCESS_TEAM_DOMAIN": "lopeznathan.cloudflareaccess.com",
     "CF_ACCESS_AUD": "3b32dc57a4364de3169f42437713e12612202884ba348f50db7a982157a1c24d",
+    "MOBILE_API_HOST": "api.scene.nathanlopez.com",
   },
 }
