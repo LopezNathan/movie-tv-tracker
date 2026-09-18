@@ -41,7 +41,7 @@ export function LibraryPage() {
     <div className="page-stack wide">
       <header>
         <p className="eyebrow">Already seen</p>
-        <h1>{filter === 'hidden' ? 'Hidden shows.' : 'Watched library.'}</h1>
+        <h1>{filter === 'hidden' ? 'Hidden shows.' : 'Library.'}</h1>
         <p className="lede">
           {filter === 'hidden'
             ? 'Shows hidden from Up Next — most recently hidden first.'

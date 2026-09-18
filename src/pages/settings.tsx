@@ -1,4 +1,5 @@
-import { Download, ExternalLink, Trash2 } from 'lucide-react';
+import { Download, ExternalLink, FileArchive, Trash2 } from 'lucide-react';
+import { Link } from 'react-router-dom';
 import { useState } from 'react';
 
 export function SettingsPage() {
@@ -26,6 +27,15 @@ export function SettingsPage() {
         <a className="button primary" href="/api/export.json" download>
           <Download size={17} /> Download JSON
         </a>
+      </section>
+      <section className="settings-card">
+        <div>
+          <h2>Import from Trakt</h2>
+          <p>Bring in your Trakt history, ratings, and watchlist from an exported ZIP.</p>
+        </div>
+        <Link className="button secondary" to="/import">
+          <FileArchive size={17} /> Import data
+        </Link>
       </section>
       <section className="settings-card">
         <div>

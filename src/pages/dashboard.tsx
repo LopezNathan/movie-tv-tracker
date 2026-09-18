@@ -84,7 +84,7 @@ export function DashboardPage() {
             <p className="eyebrow">The log</p>
             <h2>Recently watched</h2>
           </div>
-          <Link to="/history">
+          <Link to="/library">
             View all <ArrowRight size={15} />
           </Link>
         </div>
