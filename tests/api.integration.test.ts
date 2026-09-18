@@ -274,6 +274,54 @@ describe('tracker API with local D1', () => {
     ]);
   });
 
+  it('reports distinct watched shows in dashboard stats', async () => {
+    await request('/api/health');
+    await seedMedia(harness.database, {
+      id: 'show-1',
+      kind: 'show',
+      tmdbId: 10,
+      title: 'Show one',
+    });
+    await seedMedia(harness.database, {
+      id: 'show-2',
+      kind: 'show',
+      tmdbId: 20,
+      title: 'Show two',
+    });
+    await seedMedia(harness.database, {
+      id: 'episode-1',
+      kind: 'episode',
+      tmdbId: 11,
+      title: 'Episode one',
+      seriesId: 'show-1',
+    });
+    await seedMedia(harness.database, {
+      id: 'episode-2',
+      kind: 'episode',
+      tmdbId: 12,
+      title: 'Episode two',
+      seriesId: 'show-1',
+    });
+    await seedMedia(harness.database, {
+      id: 'episode-3',
+      kind: 'episode',
+      tmdbId: 21,
+      title: 'Episode three',
+      seriesId: 'show-2',
+    });
+
+    await request('/api/watch-events', body('POST', { mediaId: 'episode-1' }));
+    await request('/api/watch-events', body('POST', { mediaId: 'episode-2' }));
+    await request('/api/watch-events', body('POST', { mediaId: 'episode-3' }));
+
+    const dashboard = await (
+      await request('/api/dashboard')
+    ).json<{
+      stats: { watchedShows: number; watchedEpisodes: number };
+    }>();
+    expect(dashboard.stats).toMatchObject({ watchedShows: 2, watchedEpisodes: 3 });
+  });
+
   it('bulk marks only aired, not-yet-watched episodes', async () => {
     await request('/api/health');
     await seedMedia(harness.database, { id: 'show-1', kind: 'show', tmdbId: 10, title: 'Show' });

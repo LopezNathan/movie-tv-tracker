@@ -17,7 +17,7 @@ struct WatchEvent: Codable, Identifiable { let id: String; let mediaId: String; 
 struct Progress: Codable { let showId: String; let watched: Int; let aired: Int; let percentage: Double; let nextEpisode: MediaRecord? }
 struct Dashboard: Codable { let upNext: [UpNext]; let recent: [WatchEvent]; let watchlist: [MediaRecord]; let stats: Stats
     struct UpNext: Codable, Identifiable { let show: MediaRecord; let progress: Progress; var id: String { show.id } }
-    struct Stats: Codable { let watchedMovies: Int; let watchedEpisodes: Int; let watchEvents: Int }
+    struct Stats: Codable { let watchedMovies: Int; let watchedShows: Int; let watchedEpisodes: Int; let watchEvents: Int }
 }
 struct MediaDetail: Codable { let media: MediaRecord; let episodes: [MediaRecord]; let watchEvents: [WatchEvent]; let rating: Int?; let inWatchlist: Bool; let hiddenFromUpNext: Bool; let progress: Progress? }
 struct SearchPage: Codable { let results: [SearchResult]; let page: Int; let totalPages: Int }

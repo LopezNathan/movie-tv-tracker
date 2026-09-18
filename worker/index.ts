@@ -267,6 +267,15 @@ app.get('/api/dashboard', async (c) => {
       watchedMovies: new Set(
         allEventRows.filter((row) => row.kind === 'movie').map((row) => row.mediaId),
       ).size,
+      watchedShows: new Set(
+        allEventRows.flatMap((row) =>
+          row.kind === 'show'
+            ? [row.mediaId]
+            : row.kind === 'episode' && row.seriesId
+              ? [row.seriesId]
+              : [],
+        ),
+      ).size,
       watchedEpisodes: new Set(
         allEventRows.filter((row) => row.kind === 'episode').map((row) => row.mediaId),
       ).size,

@@ -56,7 +56,12 @@ export type DashboardResponse = {
   upNext: Array<{ show: MediaRecord; progress: ShowProgress }>;
   recent: WatchEventWithShow[];
   watchlist: MediaRecord[];
-  stats: { watchedMovies: number; watchedEpisodes: number; watchEvents: number };
+  stats: {
+    watchedMovies: number;
+    watchedShows: number;
+    watchedEpisodes: number;
+    watchEvents: number;
+  };
 };
 
 export type MediaDetailResponse = {

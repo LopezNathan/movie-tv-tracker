@@ -49,6 +49,10 @@ function TrackerApp() {
               <small>Movies</small>
             </span>
             <span className="header-stat">
+              <strong>{stats.watchedShows}</strong>
+              <small>Shows</small>
+            </span>
+            <span className="header-stat">
               <strong>{stats.watchedEpisodes}</strong>
               <small>Episodes</small>
             </span>
