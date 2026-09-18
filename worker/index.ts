@@ -119,7 +119,8 @@ function requireBrowserHost(c: { req: { url: string }; env: AppEnv['Bindings'] }
 app.get('/api/mobile/pair', requireUser, async (c) => {
   const callback = c.req.query('callback');
   const state = c.req.query('state');
-  if (!callback || !state) throw new HTTPException(400, { message: 'A callback and state are required.' });
+  if (!callback || !state)
+    throw new HTTPException(400, { message: 'A callback and state are required.' });
   let callbackUrl: URL;
   try {
     callbackUrl = new URL(callback);
@@ -129,7 +130,10 @@ app.get('/api/mobile/pair', requireUser, async (c) => {
   if (callbackUrl.protocol !== 'scene:' || callbackUrl.host !== 'auth') {
     throw new HTTPException(400, { message: 'Unsupported callback URL.' });
   }
-  callbackUrl.searchParams.set('code', await createPairingCode(drizzle(c.env.DB), c.get('user').id));
+  callbackUrl.searchParams.set(
+    'code',
+    await createPairingCode(drizzle(c.env.DB), c.get('user').id),
+  );
   callbackUrl.searchParams.set('state', state);
   return c.redirect(callbackUrl.toString(), 302);
 });
@@ -142,19 +146,33 @@ app.post('/api/mobile/pair-code', requireUser, async (c) => {
   return c.json({ code: await createPairingCode(drizzle(c.env.DB), c.get('user').id) });
 });
 
-app.post('/api/mobile/sessions/exchange', zValidator('json', z.object({ code: z.string().min(20) })), async (c) => {
-  requireMobileHost(c);
-  const tokens = await exchangePairingCode(drizzle(c.env.DB), c.req.valid('json').code);
-  if (!tokens) throw new HTTPException(401, { message: 'This pairing code is invalid, expired, or already used.' });
-  return c.json(tokens, 201);
-});
+app.post(
+  '/api/mobile/sessions/exchange',
+  zValidator('json', z.object({ code: z.string().min(20) })),
+  async (c) => {
+    requireMobileHost(c);
+    const tokens = await exchangePairingCode(drizzle(c.env.DB), c.req.valid('json').code);
+    if (!tokens)
+      throw new HTTPException(401, {
+        message: 'This pairing code is invalid, expired, or already used.',
+      });
+    return c.json(tokens, 201);
+  },
+);
 
-app.post('/api/mobile/sessions/refresh', zValidator('json', z.object({ refreshToken: z.string().min(20) })), async (c) => {
-  requireMobileHost(c);
-  const tokens = await rotateMobileSession(drizzle(c.env.DB), c.req.valid('json').refreshToken);
-  if (!tokens) throw new HTTPException(401, { message: 'This refresh token is invalid, expired, or already used.' });
-  return c.json(tokens);
-});
+app.post(
+  '/api/mobile/sessions/refresh',
+  zValidator('json', z.object({ refreshToken: z.string().min(20) })),
+  async (c) => {
+    requireMobileHost(c);
+    const tokens = await rotateMobileSession(drizzle(c.env.DB), c.req.valid('json').refreshToken);
+    if (!tokens)
+      throw new HTTPException(401, {
+        message: 'This refresh token is invalid, expired, or already used.',
+      });
+    return c.json(tokens);
+  },
+);
 app.use('/api/*', requireUser);
 
 app.delete('/api/mobile/sessions/current', async (c) => {

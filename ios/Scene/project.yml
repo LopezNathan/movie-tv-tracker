@@ -31,7 +31,7 @@ targets:
     type: bundle.unit-test
     platform: iOS
     sources: [SceneTests]
-    dependencies: [{target: Scene}]
+    dependencies: [{ target: Scene }]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nathanlopez.scene.tests
@@ -39,13 +39,13 @@ targets:
     type: bundle.ui-testing
     platform: iOS
     sources: [SceneUITests]
-    dependencies: [{target: Scene}]
+    dependencies: [{ target: Scene }]
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.nathanlopez.scene.uitests
 schemes:
   Scene:
     build:
-      targets: {Scene: all, SceneTests: [test], SceneUITests: [test]}
+      targets: { Scene: all, SceneTests: [test], SceneUITests: [test] }
     test:
       targets: [SceneTests, SceneUITests]

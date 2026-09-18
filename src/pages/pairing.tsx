@@ -6,14 +6,16 @@ import { useEffect, useState } from 'react';
  * worker from returning the Scene app shell instead of the native callback.
  */
 export function PairingPage() {
-  const [message, setMessage] = useState('Finishing secure pairing…');
+  const state = new URLSearchParams(window.location.search).get('state');
+  const validState = Boolean(state && /^[0-9a-f-]{36}$/i.test(state));
+  const [message, setMessage] = useState(() =>
+    validState
+      ? 'Finishing secure pairing…'
+      : 'This pairing request is invalid. Return to Scene and try again.',
+  );
 
   useEffect(() => {
-    const state = new URLSearchParams(window.location.search).get('state');
-    if (!state || !/^[0-9a-f-]{36}$/i.test(state)) {
-      setMessage('This pairing request is invalid. Return to Scene and try again.');
-      return;
-    }
+    if (!validState || !state) return;
     void fetch('/api/mobile/pair-code', { method: 'POST' })
       .then(async (response) => {
         if (!response.ok) throw new Error('Unable to create a pairing code.');
@@ -26,7 +28,7 @@ export function PairingPage() {
         window.location.replace(callback.toString());
       })
       .catch(() => setMessage('Pairing could not be completed. Return to Scene and try again.'));
-  }, []);
+  }, [state, validState]);
 
   return (
     <main className="main-content" aria-live="polite">

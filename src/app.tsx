@@ -23,6 +23,11 @@ const routes = [
 export function App() {
   const location = useLocation();
   if (location.pathname === '/pair') return <PairingPage />;
+
+  return <TrackerApp />;
+}
+
+function TrackerApp() {
   const dashboard = useQuery({ queryKey: ['dashboard'], queryFn: queries.dashboard });
   const stats = dashboard.data?.stats;
 

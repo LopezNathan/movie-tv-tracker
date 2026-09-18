@@ -21,7 +21,10 @@ const REFRESH_TTL_MS = 1000 * 60 * 60 * 24 * 90;
 
 function token() {
   const bytes = crypto.getRandomValues(new Uint8Array(32));
-  return btoa(String.fromCharCode(...bytes)).replaceAll('+', '-').replaceAll('/', '_').replaceAll('=', '');
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
 }
 
 export async function tokenHash(value: string) {
@@ -88,7 +91,10 @@ export async function rotateMobileSession(db: Database, refreshToken: string) {
     .get();
   if (!row || row.revokedAt || row.refreshExpiresAt <= now.toISOString()) return null;
   // One-time refresh: revoke the old credential before issuing the rotated pair.
-  await db.update(mobileSessions).set({ revokedAt: now.toISOString() }).where(eq(mobileSessions.id, row.id));
+  await db
+    .update(mobileSessions)
+    .set({ revokedAt: now.toISOString() })
+    .where(eq(mobileSessions.id, row.id));
   return createMobileSession(db, row.userId);
 }
 
@@ -168,9 +174,13 @@ export async function requireUser(c: Context<AppEnv>, next: Next) {
         ),
       )
       .get();
-    if (!session) throw new HTTPException(401, { message: 'This mobile session has expired or been revoked.' });
+    if (!session)
+      throw new HTTPException(401, { message: 'This mobile session has expired or been revoked.' });
     const db = drizzle(c.env.DB);
-    await db.update(mobileSessions).set({ lastUsedAt: now }).where(eq(mobileSessions.id, session.id));
+    await db
+      .update(mobileSessions)
+      .set({ lastUsedAt: now })
+      .where(eq(mobileSessions.id, session.id));
     c.set('user', { id: session.userId, email: session.email });
     await next();
     return;
