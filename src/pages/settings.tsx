@@ -33,7 +33,7 @@ export function SettingsPage() {
           <h2>Import from Trakt</h2>
           <p>Bring in your Trakt history, ratings, and watchlist from an exported ZIP.</p>
         </div>
-        <Link className="button secondary" to="/import">
+        <Link className="button primary" to="/import">
           <FileArchive size={17} /> Import data
         </Link>
       </section>
@@ -47,7 +47,7 @@ export function SettingsPage() {
             </p>
           ) : null}
         </div>
-        <button className="button secondary" onClick={() => void clearOfflineData()}>
+        <button className="button primary" onClick={() => void clearOfflineData()}>
           <Trash2 size={17} /> Clear offline data
         </button>
       </section>
@@ -57,7 +57,7 @@ export function SettingsPage() {
           <p>This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
         </div>
         <a
-          className="button secondary"
+          className="button primary"
           href="https://www.themoviedb.org"
           target="_blank"
           rel="noreferrer"
