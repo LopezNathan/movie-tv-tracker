@@ -85,11 +85,6 @@ export function SearchPage() {
             Try a shorter title, alternate spelling, or original-language name.
           </EmptyState>
         ))}
-      {!query && (
-        <EmptyState title="A clean slate">
-          Search results come directly from TMDB and are not added to your library automatically.
-        </EmptyState>
-      )}
     </div>
   );
 }

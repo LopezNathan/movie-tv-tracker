@@ -161,6 +161,15 @@ describe('tracker API with local D1', () => {
     expect((await (await request('/api/history')).json<{ items: unknown[] }>()).items).toHaveLength(
       1,
     );
+    expect(
+      await harness.database
+        .prepare(
+          `SELECT latest_watched_at AS latestWatchedAt, watch_count AS watchCount
+           FROM user_media_watch_state WHERE user_id = ? AND media_id = ?`,
+        )
+        .bind('dev:owner@example.test', 'movie-1')
+        .first(),
+    ).toEqual({ latestWatchedAt: '2026-01-01T00:00:00.000Z', watchCount: 1 });
 
     expect((await request('/api/ratings/movie-1', body('PUT', { rating: 8 }))).status).toBe(200);
     expect((await request('/api/ratings/movie-1', body('PUT', { rating: 11 }))).status).toBe(400);

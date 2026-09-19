@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, countDistinct, desc, eq, inArray, lt, max, or } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, inArray, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -19,6 +19,7 @@ import {
   ratings,
   upNextExclusions,
   watchEvents,
+  userMediaWatchState,
 } from './db/schema';
 import type { AppEnv } from './env';
 import {
@@ -92,9 +93,9 @@ function eventRecord(row: {
 
 async function getWatchedIds(db: ReturnType<typeof drizzle>, userId: string) {
   const rows = await db
-    .select({ mediaId: watchEvents.mediaId })
-    .from(watchEvents)
-    .where(eq(watchEvents.userId, userId));
+    .select({ mediaId: userMediaWatchState.mediaId })
+    .from(userMediaWatchState)
+    .where(eq(userMediaWatchState.userId, userId));
   return new Set(rows.map((row) => row.mediaId));
 }
 
@@ -206,7 +207,7 @@ app.get(
 app.get('/api/dashboard', async (c) => {
   const db = drizzle(c.env.DB);
   const user = c.get('user');
-  const [recentRows, watchlistRows, allEventRows, episodeRows, showRows, excludedRows] =
+  const [recentRows, watchlistRows, watchedStateRows, episodeRows, showRows, excludedRows] =
     await Promise.all([
       db
         .select({ event: watchEvents, item: media })
@@ -223,10 +224,15 @@ app.get('/api/dashboard', async (c) => {
         .orderBy(desc(listEntries.addedAt))
         .limit(12),
       db
-        .select({ mediaId: watchEvents.mediaId, kind: media.kind, seriesId: media.seriesId })
-        .from(watchEvents)
-        .innerJoin(media, eq(watchEvents.mediaId, media.id))
-        .where(eq(watchEvents.userId, user.id)),
+        .select({
+          mediaId: userMediaWatchState.mediaId,
+          kind: media.kind,
+          seriesId: media.seriesId,
+          watchCount: userMediaWatchState.watchCount,
+        })
+        .from(userMediaWatchState)
+        .innerJoin(media, eq(userMediaWatchState.mediaId, media.id))
+        .where(eq(userMediaWatchState.userId, user.id)),
       db
         .select()
         .from(media)
@@ -239,10 +245,10 @@ app.get('/api/dashboard', async (c) => {
         .where(eq(upNextExclusions.userId, user.id)),
     ]);
 
-  const watchedIds = new Set(allEventRows.map((row) => row.mediaId));
+  const watchedIds = new Set(watchedStateRows.map((row) => row.mediaId));
   const excludedShowIds = new Set(excludedRows.map((row) => row.showId));
   const startedShowIds = new Set(
-    allEventRows.flatMap((row) => (row.seriesId ? [row.seriesId] : [])),
+    watchedStateRows.flatMap((row) => (row.seriesId ? [row.seriesId] : [])),
   );
   const upNext = showRows
     .filter((show) => startedShowIds.has(show.id) && !excludedShowIds.has(show.id))
@@ -265,10 +271,10 @@ app.get('/api/dashboard', async (c) => {
     watchlist: watchlistRows.map((row) => row.item as MediaRecord),
     stats: {
       watchedMovies: new Set(
-        allEventRows.filter((row) => row.kind === 'movie').map((row) => row.mediaId),
+        watchedStateRows.filter((row) => row.kind === 'movie').map((row) => row.mediaId),
       ).size,
       watchedShows: new Set(
-        allEventRows.flatMap((row) =>
+        watchedStateRows.flatMap((row) =>
           row.kind === 'show'
             ? [row.mediaId]
             : row.kind === 'episode' && row.seriesId
@@ -277,9 +283,9 @@ app.get('/api/dashboard', async (c) => {
         ),
       ).size,
       watchedEpisodes: new Set(
-        allEventRows.filter((row) => row.kind === 'episode').map((row) => row.mediaId),
+        watchedStateRows.filter((row) => row.kind === 'episode').map((row) => row.mediaId),
       ).size,
-      watchEvents: allEventRows.length,
+      watchEvents: watchedStateRows.reduce((total, row) => total + row.watchCount, 0),
     },
   };
   return c.json(payload);
@@ -515,38 +521,27 @@ app.get(
             : null,
       });
     }
-    const latestWatched = db.$with('latest_watched').as(
-      db
-        .select({
-          mediaId: watchEvents.mediaId,
-          watchedAt: max(watchEvents.watchedAt).as('watched_at'),
-        })
-        .from(watchEvents)
-        .where(eq(watchEvents.userId, user.id))
-        .groupBy(watchEvents.mediaId),
-    );
     const kindCondition = kind ? eq(media.kind, kind) : undefined;
     const cursorCondition =
       before && beforeId
         ? or(
-            lt(latestWatched.watchedAt, before),
-            and(eq(latestWatched.watchedAt, before), lt(media.id, beforeId)),
+            lt(userMediaWatchState.latestWatchedAt, before),
+            and(eq(userMediaWatchState.latestWatchedAt, before), lt(media.id, beforeId)),
           )
         : undefined;
     const [rows, totals] = await Promise.all([
       db
-        .with(latestWatched)
-        .select({ item: media, watchedAt: latestWatched.watchedAt })
-        .from(latestWatched)
-        .innerJoin(media, eq(latestWatched.mediaId, media.id))
-        .where(and(kindCondition, cursorCondition))
-        .orderBy(desc(latestWatched.watchedAt), desc(media.id))
+        .select({ item: media, watchedAt: userMediaWatchState.latestWatchedAt })
+        .from(userMediaWatchState)
+        .innerJoin(media, eq(userMediaWatchState.mediaId, media.id))
+        .where(and(eq(userMediaWatchState.userId, user.id), kindCondition, cursorCondition))
+        .orderBy(desc(userMediaWatchState.latestWatchedAt), desc(media.id))
         .limit(limit + 1),
       db
-        .select({ total: countDistinct(watchEvents.mediaId) })
-        .from(watchEvents)
-        .innerJoin(media, eq(watchEvents.mediaId, media.id))
-        .where(and(eq(watchEvents.userId, user.id), kindCondition)),
+        .select({ total: count() })
+        .from(userMediaWatchState)
+        .innerJoin(media, eq(userMediaWatchState.mediaId, media.id))
+        .where(and(eq(userMediaWatchState.userId, user.id), kindCondition)),
     ]);
     const hasMore = rows.length > limit;
     const items = rows.slice(0, limit);

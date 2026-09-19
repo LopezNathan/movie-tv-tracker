@@ -2,6 +2,22 @@ import { readdir, readFile } from 'node:fs/promises';
 import { convertV4MiniflareOptions, Miniflare } from 'miniflare';
 import type { Bindings } from '../worker/env';
 
+function migrationStatements(migration: string) {
+  const statements: string[] = [];
+  let statement = '';
+  let inTrigger = false;
+  for (const line of migration.split('\n')) {
+    statement += `${line}\n`;
+    if (/^\s*CREATE TRIGGER\b/i.test(line)) inTrigger = true;
+    if (inTrigger ? /^\s*END;\s*$/i.test(line) : /;\s*$/.test(line)) {
+      if (statement.trim()) statements.push(statement);
+      statement = '';
+      inTrigger = false;
+    }
+  }
+  return statements;
+}
+
 export async function createTestDatabase() {
   const miniflare = new Miniflare(
     convertV4MiniflareOptions({
@@ -18,10 +34,7 @@ export async function createTestDatabase() {
     .sort();
   for (const file of migrationFiles) {
     const migration = await readFile(new URL(file, migrationsUrl), 'utf8');
-    for (const statement of migration
-      .split(';')
-      .map((value) => value.trim())
-      .filter(Boolean)) {
+    for (const statement of migrationStatements(migration)) {
       await database.prepare(statement).run();
     }
   }

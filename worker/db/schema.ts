@@ -67,6 +67,30 @@ export const watchEvents = sqliteTable(
   ],
 );
 
+// A compact, transactionally maintained projection of watch_events. Read paths
+// use this table when they only need "has watched" or the latest watch time.
+export const userMediaWatchState = sqliteTable(
+  'user_media_watch_state',
+  {
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    mediaId: text('media_id')
+      .notNull()
+      .references(() => media.id, { onDelete: 'cascade' }),
+    latestWatchedAt: text('latest_watched_at').notNull(),
+    watchCount: integer('watch_count').notNull(),
+  },
+  (table) => [
+    uniqueIndex('user_media_watch_state_user_media_unique').on(table.userId, table.mediaId),
+    index('user_media_watch_state_user_latest_idx').on(
+      table.userId,
+      table.latestWatchedAt,
+      table.mediaId,
+    ),
+  ],
+);
+
 export const ratings = sqliteTable(
   'ratings',
   {

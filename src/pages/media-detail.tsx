@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, BookmarkCheck, Check, Eye, EyeOff, RefreshCw, Star } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Check, Eye, EyeOff, Star } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import type { MediaRecord } from '../../shared/types';
 import { ErrorState, LoadingState } from '../components/async-state';
@@ -81,7 +81,9 @@ export function MediaDetailPage() {
       {backdrop && (
         <div className="detail-backdrop" style={{ backgroundImage: `url(${backdrop})` }} />
       )}
-      <section className="detail-hero">
+      <section
+        className={data.media.kind === 'show' ? 'detail-hero show-detail-hero' : 'detail-hero'}
+      >
         <div className="detail-poster">
           {poster ? (
             <img src={poster} alt={`${data.media.title} poster`} />
@@ -119,13 +121,6 @@ export function MediaDetailPage() {
             >
               {data.inWatchlist ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
               {data.inWatchlist ? 'In watchlist' : 'Add to watchlist'}
-            </button>
-            <button
-              className="button ghost"
-              onClick={() => detail.refetch()}
-              disabled={detail.isFetching}
-            >
-              <RefreshCw size={17} /> Refresh
             </button>
             {data.media.kind === 'show' && (
               <button
