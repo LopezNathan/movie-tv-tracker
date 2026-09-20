@@ -331,6 +331,73 @@ describe('tracker API with local D1', () => {
     expect(dashboard.stats).toMatchObject({ watchedShows: 2, watchedEpisodes: 3 });
   });
 
+  it('lists shows watched through their episodes in the watched library', async () => {
+    await request('/api/health');
+    await seedMedia(harness.database, {
+      id: '00000000-0000-4000-8000-000000000101',
+      kind: 'show',
+      tmdbId: 101,
+      title: 'Episode-led show',
+    });
+    await seedMedia(harness.database, {
+      id: '00000000-0000-4000-8000-000000000102',
+      kind: 'episode',
+      tmdbId: 102,
+      title: 'Pilot',
+      seriesId: '00000000-0000-4000-8000-000000000101',
+    });
+
+    await request(
+      '/api/watch-events',
+      body('POST', {
+        mediaId: '00000000-0000-4000-8000-000000000102',
+        watchedAt: '2026-03-01T00:00:00.000Z',
+      }),
+    );
+
+    const library = await (
+      await request('/api/library?filter=watched&kind=show')
+    ).json<{ items: Array<{ item: { id: string }; watchedAt: string }>; total: number }>();
+    expect(library).toMatchObject({
+      total: 1,
+      items: [
+        {
+          item: { id: '00000000-0000-4000-8000-000000000101' },
+          watchedAt: '2026-03-01T00:00:00.000Z',
+        },
+      ],
+    });
+  });
+
+  it('lists episode-led shows without exceeding D1 query parameter limits', async () => {
+    await request('/api/health');
+    for (let index = 0; index < 101; index += 1) {
+      const suffix = String(index + 200).padStart(12, '0');
+      const showId = `00000000-0000-4000-8000-${suffix}`;
+      const episodeId = `00000000-0000-4000-8001-${suffix}`;
+      await seedMedia(harness.database, {
+        id: showId,
+        kind: 'show',
+        tmdbId: index + 200,
+        title: `Show ${index}`,
+      });
+      await seedMedia(harness.database, {
+        id: episodeId,
+        kind: 'episode',
+        tmdbId: index + 400,
+        title: `Episode ${index}`,
+        seriesId: showId,
+      });
+      await request('/api/watch-events', body('POST', { mediaId: episodeId }));
+    }
+
+    const library = await (
+      await request('/api/library?filter=watched&kind=show')
+    ).json<{ items: unknown[]; total: number }>();
+    expect(library.total).toBe(101);
+    expect(library.items).toHaveLength(60);
+  }, 10_000);
+
   it('bulk marks only aired, not-yet-watched episodes', async () => {
     await request('/api/health');
     await seedMedia(harness.database, { id: 'show-1', kind: 'show', tmdbId: 10, title: 'Show' });

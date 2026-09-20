@@ -521,6 +521,73 @@ app.get(
             : null,
       });
     }
+    // A series becomes watched when any of its episodes is watched. Keep that
+    // behavior consistent with the dashboard's watched-show count, rather than
+    // requiring a separate watch event on the series itself.
+    if (kind === 'show') {
+      const watchedRows = await db
+        .select({ item: media, watchedAt: userMediaWatchState.latestWatchedAt })
+        .from(userMediaWatchState)
+        .innerJoin(media, eq(userMediaWatchState.mediaId, media.id))
+        .where(
+          and(
+            eq(userMediaWatchState.userId, user.id),
+            or(eq(media.kind, 'show'), eq(media.kind, 'episode')),
+          ),
+        );
+      const showIds = [
+        ...new Set(
+          watchedRows.flatMap(({ item }) =>
+            item.kind === 'show' ? [item.id] : item.seriesId ? [item.seriesId] : [],
+          ),
+        ),
+      ];
+      // D1 has a small bound-parameter limit, so a large episode library must
+      // not become one enormous `IN (...)` query.
+      const showRows = (
+        await Promise.all(
+          Array.from({ length: Math.ceil(showIds.length / 50) }, (_, index) => {
+            const ids = showIds.slice(index * 50, (index + 1) * 50);
+            return db
+              .select()
+              .from(media)
+              .where(and(eq(media.kind, 'show'), inArray(media.id, ids)));
+          }),
+        )
+      ).flat();
+      const showsById = new Map(showRows.map((show) => [show.id, show as MediaRecord]));
+      const watchedShows = new Map<string, { item: MediaRecord; watchedAt: string }>();
+      for (const { item, watchedAt } of watchedRows) {
+        const showId = item.kind === 'show' ? item.id : item.seriesId;
+        const show = showId ? showsById.get(showId) : undefined;
+        if (!show) continue;
+        const existing = watchedShows.get(show.id);
+        if (!existing || watchedAt > existing.watchedAt) {
+          watchedShows.set(show.id, { item: show, watchedAt });
+        }
+      }
+      const ordered = [...watchedShows.values()]
+        .sort(
+          (a, b) => b.watchedAt.localeCompare(a.watchedAt) || b.item.id.localeCompare(a.item.id),
+        )
+        .filter(
+          (row) =>
+            !before ||
+            !beforeId ||
+            row.watchedAt < before ||
+            (row.watchedAt === before && row.item.id < beforeId),
+        );
+      const items = ordered.slice(0, limit);
+      const lastItem = items.at(-1);
+      return c.json({
+        items,
+        total: watchedShows.size,
+        nextCursor:
+          ordered.length > limit && lastItem
+            ? { watchedAt: lastItem.watchedAt, itemId: lastItem.item.id }
+            : null,
+      });
+    }
     const kindCondition = kind ? eq(media.kind, kind) : undefined;
     const cursorCondition =
       before && beforeId
