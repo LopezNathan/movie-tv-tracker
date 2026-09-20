@@ -106,7 +106,7 @@ export function LibraryPage() {
               title={filter === 'hidden' ? 'No hidden shows' : `No ${filter}s watched yet`}
             >
               {filter === 'hidden'
-                ? 'Hide a show from its detail page to keep it out of Up Next.'
+                ? 'Hover over a show in Up Next to hide it.'
                 : 'Try another filter to see more of your library.'}
             </EmptyState>
           )}
@@ -116,7 +116,7 @@ export function LibraryPage() {
           title={filter === 'hidden' ? 'No hidden shows' : 'Your watched library is waiting'}
         >
           {filter === 'hidden' ? (
-            'Hide a show from its detail page to keep it out of Up Next.'
+            'Hover over a show in Up Next to hide it.'
           ) : (
             <>
               <Link to="/search">Find something to watch</Link> and mark it watched to add it here.

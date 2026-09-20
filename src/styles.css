@@ -484,6 +484,15 @@ h3 {
   color: var(--accent-ink);
   box-shadow: 0 4px 18px #0008;
 }
+.up-next-watch {
+  z-index: 2;
+  border: 0;
+  cursor: pointer;
+}
+.up-next-watch:hover {
+  background: var(--accent-hot);
+  transform: scale(1.08);
+}
 .progress-track {
   height: 3px;
   margin-top: 0.5rem;
@@ -502,6 +511,98 @@ h3 {
   font-size: 0.68rem;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.up-next-card {
+  position: relative;
+}
+.up-next-card-open {
+  z-index: 10;
+}
+.up-next-card-link {
+  display: block;
+  color: inherit;
+}
+.up-next-card .poster-wrap {
+  overflow: visible;
+  z-index: 3;
+}
+.up-next-poster-link {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.up-next-hide {
+  position: absolute;
+  top: 0.55rem;
+  right: 0.55rem;
+  z-index: 2;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  padding: 0.38rem 0.5rem;
+  border: 1px solid #ffffff26;
+  border-radius: 999px;
+  background: #181714e8;
+  color: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.62rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  opacity: 0;
+  text-transform: uppercase;
+  transform: translateY(-0.2rem);
+  transition:
+    opacity 160ms ease,
+    transform 160ms ease,
+    background 160ms ease;
+}
+.up-next-card:hover .up-next-hide,
+.up-next-card:focus-within .up-next-hide {
+  opacity: 1;
+  transform: translateY(0);
+}
+.up-next-hide:hover:not(:disabled) {
+  background: #ad3434;
+}
+.up-next-hide:disabled {
+  cursor: wait;
+}
+.up-next-watch-popup {
+  position: absolute;
+  right: 0;
+  bottom: calc(0.7rem + 36px + 0.5rem);
+  z-index: 30;
+  width: min(320px, calc(100vw - 2rem));
+  padding: 1rem;
+  border: 1px solid var(--line-bright);
+  background: #202019;
+  isolation: isolate;
+  box-shadow:
+    14px 18px 0 #050504,
+    0 0 0 1px #050504;
+}
+.up-next-watch-popup .watch-menu {
+  position: static;
+  width: auto;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.up-next-watch-title {
+  margin: 0;
+  color: var(--ink);
+  font-family: var(--display);
+  font-size: 1rem;
+  line-height: 1.1;
+}
+.up-next-watch-actions {
+  display: flex;
+  justify-content: end;
+  gap: 0.5rem;
 }
 
 .poster-grid {

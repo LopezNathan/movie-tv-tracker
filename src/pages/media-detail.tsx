@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Bookmark, BookmarkCheck, Check, Eye, EyeOff, Star } from 'lucide-react';
+import { Bookmark, BookmarkCheck, Check, Eye, Star } from 'lucide-react';
 import { useParams } from 'react-router-dom';
 import type { MediaRecord } from '../../shared/types';
 import { ErrorState, LoadingState } from '../components/async-state';
@@ -52,9 +52,8 @@ export function MediaDetailPage() {
       api<{ created: number }>('/api/bulk-watch', json('POST', body)),
     onSuccess: refreshAll,
   });
-  const upNextVisibility = useMutation({
-    mutationFn: ({ mediaId, hidden }: { mediaId: string; hidden: boolean }) =>
-      api(`/api/up-next/${mediaId}`, json('PUT', { hidden })),
+  const restoreUpNext = useMutation({
+    mutationFn: (mediaId: string) => api(`/api/up-next/${mediaId}`, json('PUT', { hidden: false })),
     onSuccess: refreshAll,
   });
 
@@ -69,12 +68,7 @@ export function MediaDetailPage() {
   const latestEvent = (mediaId: string) =>
     data.watchEvents.find((event) => event.mediaId === mediaId);
   const actionError =
-    watch.error ??
-    undo.error ??
-    watchlist.error ??
-    rate.error ??
-    bulk.error ??
-    upNextVisibility.error;
+    watch.error ?? undo.error ?? watchlist.error ?? rate.error ?? bulk.error ?? restoreUpNext.error;
 
   return (
     <div className="detail-page">
@@ -122,20 +116,14 @@ export function MediaDetailPage() {
               {data.inWatchlist ? <BookmarkCheck size={18} /> : <Bookmark size={18} />}
               {data.inWatchlist ? 'In watchlist' : 'Add to watchlist'}
             </button>
-            {data.media.kind === 'show' && (
+            {data.media.kind === 'show' && data.hiddenFromUpNext && (
               <button
                 className="button ghost"
-                onClick={() =>
-                  upNextVisibility.mutate({
-                    mediaId: data.media.id,
-                    hidden: !data.hiddenFromUpNext,
-                  })
-                }
-                disabled={upNextVisibility.isPending}
-                aria-pressed={data.hiddenFromUpNext}
+                onClick={() => restoreUpNext.mutate(data.media.id)}
+                disabled={restoreUpNext.isPending}
               >
-                {data.hiddenFromUpNext ? <Eye size={17} /> : <EyeOff size={17} />}
-                {data.hiddenFromUpNext ? 'Show in Up Next' : 'Hide from Up Next'}
+                <Eye size={17} />
+                Show in Up Next
               </button>
             )}
           </div>
