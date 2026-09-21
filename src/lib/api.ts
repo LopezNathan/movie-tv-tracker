@@ -131,9 +131,10 @@ export const queries = {
     }
     return api<WatchlistPage>(`/api/library?${params}`);
   },
-  watchedLibrary: (kind?: MediaKind, cursor?: WatchedLibraryCursor | null) => {
+  watchedLibrary: (kind?: MediaKind, cursor?: WatchedLibraryCursor | null, query?: string) => {
     const params = new URLSearchParams({ filter: 'watched', limit: '60' });
     if (kind) params.set('kind', kind);
+    if (query?.trim()) params.set('q', query.trim());
     if (cursor) {
       params.set('before', cursor.watchedAt);
       params.set('beforeId', cursor.itemId);

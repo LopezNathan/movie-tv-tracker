@@ -1,5 +1,5 @@
 import { zValidator } from '@hono/zod-validator';
-import { and, asc, count, countDistinct, desc, eq, inArray, lt, or } from 'drizzle-orm';
+import { and, asc, count, countDistinct, desc, eq, inArray, like, lt, or } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/d1';
 import { Hono } from 'hono';
 import { HTTPException } from 'hono/http-exception';
@@ -89,6 +89,15 @@ function eventRecord(row: {
     source: row.event.source,
     media: row.item as MediaRecord,
   };
+}
+
+function titleMatchesSearch(title: string, query?: string) {
+  if (!query) return true;
+  const titleWords = title.toLocaleLowerCase().split(/[^\p{L}\p{N}]+/u);
+  return query
+    .toLocaleLowerCase()
+    .split(/\s+/)
+    .every((term) => titleWords.some((word) => word.startsWith(term)));
 }
 
 async function getWatchedIds(db: ReturnType<typeof drizzle>, userId: string) {
@@ -431,6 +440,7 @@ app.get(
       .object({
         filter: z.enum(['watchlist', 'watched', 'rated', 'hidden']).default('watchlist'),
         kind: z.enum(['movie', 'show', 'episode']).optional(),
+        q: z.string().trim().max(200).optional(),
         before: isoTimestamp.optional(),
         beforeId: z.string().uuid().optional(),
         limit: z.coerce.number().int().min(1).max(100).default(60),
@@ -441,7 +451,7 @@ app.get(
       }),
   ),
   async (c) => {
-    const { filter, kind, before, beforeId, limit } = c.req.valid('query');
+    const { filter, kind, q, before, beforeId, limit } = c.req.valid('query');
     const db = drizzle(c.env.DB);
     const user = c.get('user');
     if (filter === 'watchlist') {
@@ -524,7 +534,7 @@ app.get(
     // A series becomes watched when any of its episodes is watched. Keep that
     // behavior consistent with the dashboard's watched-show count, rather than
     // requiring a separate watch event on the series itself.
-    if (kind === 'show') {
+    if (kind === 'show' || !kind) {
       const watchedRows = await db
         .select({ item: media, watchedAt: userMediaWatchState.latestWatchedAt })
         .from(userMediaWatchState)
@@ -532,7 +542,7 @@ app.get(
         .where(
           and(
             eq(userMediaWatchState.userId, user.id),
-            or(eq(media.kind, 'show'), eq(media.kind, 'episode')),
+            kind === 'show' ? or(eq(media.kind, 'show'), eq(media.kind, 'episode')) : undefined,
           ),
         );
       const showIds = [
@@ -566,7 +576,15 @@ app.get(
           watchedShows.set(show.id, { item: show, watchedAt });
         }
       }
-      const ordered = [...watchedShows.values()]
+      const matchingItems = [
+        ...(kind === 'show'
+          ? []
+          : watchedRows
+              .filter(({ item }) => item.kind !== 'show')
+              .map(({ item, watchedAt }) => ({ item: item as MediaRecord, watchedAt }))),
+        ...watchedShows.values(),
+      ].filter((row) => titleMatchesSearch(row.item.title, q));
+      const ordered = matchingItems
         .sort(
           (a, b) => b.watchedAt.localeCompare(a.watchedAt) || b.item.id.localeCompare(a.item.id),
         )
@@ -579,9 +597,50 @@ app.get(
         );
       const items = ordered.slice(0, limit);
       const lastItem = items.at(-1);
+      const seriesIds = [
+        ...new Set(
+          items.flatMap((row) =>
+            row.item.kind === 'episode' && row.item.seriesId ? [row.item.seriesId] : [],
+          ),
+        ),
+      ];
+      const episodeShowRows = seriesIds.length
+        ? await db.select().from(media).where(inArray(media.id, seriesIds))
+        : [];
+      const episodeShowsById = new Map(
+        episodeShowRows.map((show) => [show.id, show as MediaRecord]),
+      );
+      const seasons = new Map<string, { show: MediaRecord; seasonNumber: number }>();
+      for (const row of items) {
+        const show = row.item.seriesId ? episodeShowsById.get(row.item.seriesId) : undefined;
+        if (row.item.kind === 'episode' && show && row.item.seasonNumber !== null) {
+          seasons.set(`${show.id}:${row.item.seasonNumber}`, {
+            show,
+            seasonNumber: row.item.seasonNumber,
+          });
+        }
+      }
+      const seasonPosters = new Map(
+        await Promise.all(
+          [...seasons.entries()].map(async ([key, { show, seasonNumber }]) => {
+            return [key, await getSeasonPoster(c.env, show, seasonNumber)] as const;
+          }),
+        ),
+      );
       return c.json({
-        items,
-        total: watchedShows.size,
+        items: items.map((row) => {
+          if (row.item.kind !== 'episode') return row;
+          const show = row.item.seriesId ? episodeShowsById.get(row.item.seriesId) : undefined;
+          const seasonPoster =
+            show && row.item.seasonNumber !== null
+              ? seasonPosters.get(`${show.id}:${row.item.seasonNumber}`)
+              : null;
+          return {
+            ...row,
+            item: { ...row.item, posterPath: seasonPoster ?? show?.posterPath ?? null },
+          };
+        }),
+        total: matchingItems.length,
         nextCursor:
           ordered.length > limit && lastItem
             ? { watchedAt: lastItem.watchedAt, itemId: lastItem.item.id }
@@ -589,6 +648,20 @@ app.get(
       });
     }
     const kindCondition = kind ? eq(media.kind, kind) : undefined;
+    const searchTerms = q?.toLocaleLowerCase().split(/\s+/).filter(Boolean) ?? [];
+    const titleCondition = searchTerms.length
+      ? and(
+          ...searchTerms.map((term) =>
+            or(
+              like(media.title, `${term}%`),
+              like(media.title, `% ${term}%`),
+              like(media.title, `%-${term}%`),
+              like(media.title, `%:${term}%`),
+              like(media.title, `%/${term}%`),
+            ),
+          ),
+        )
+      : undefined;
     const cursorCondition =
       before && beforeId
         ? or(
@@ -601,14 +674,21 @@ app.get(
         .select({ item: media, watchedAt: userMediaWatchState.latestWatchedAt })
         .from(userMediaWatchState)
         .innerJoin(media, eq(userMediaWatchState.mediaId, media.id))
-        .where(and(eq(userMediaWatchState.userId, user.id), kindCondition, cursorCondition))
+        .where(
+          and(
+            eq(userMediaWatchState.userId, user.id),
+            kindCondition,
+            titleCondition,
+            cursorCondition,
+          ),
+        )
         .orderBy(desc(userMediaWatchState.latestWatchedAt), desc(media.id))
         .limit(limit + 1),
       db
         .select({ total: count() })
         .from(userMediaWatchState)
         .innerJoin(media, eq(userMediaWatchState.mediaId, media.id))
-        .where(and(eq(userMediaWatchState.userId, user.id), kindCondition)),
+        .where(and(eq(userMediaWatchState.userId, user.id), kindCondition, titleCondition)),
     ]);
     const hasMore = rows.length > limit;
     const items = rows.slice(0, limit);

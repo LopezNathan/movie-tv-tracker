@@ -196,9 +196,19 @@ describe('tracker API with local D1', () => {
     const movieOne = '00000000-0000-4000-8000-000000000001';
     const showOne = '00000000-0000-4000-8000-000000000002';
     const movieTwo = '00000000-0000-4000-8000-000000000003';
-    await seedMedia(harness.database, { id: movieOne, kind: 'movie', tmdbId: 1, title: 'First' });
+    await seedMedia(harness.database, {
+      id: movieOne,
+      kind: 'movie',
+      tmdbId: 1,
+      title: 'Ted Lasso',
+    });
     await seedMedia(harness.database, { id: showOne, kind: 'show', tmdbId: 2, title: 'Second' });
-    await seedMedia(harness.database, { id: movieTwo, kind: 'movie', tmdbId: 3, title: 'Third' });
+    await seedMedia(harness.database, {
+      id: movieTwo,
+      kind: 'movie',
+      tmdbId: 3,
+      title: 'Uninvited',
+    });
     const userId = 'dev:owner@example.test';
     const events = [
       ['event-1', movieOne, '2026-01-01T00:00:00.000Z'],
@@ -248,6 +258,12 @@ describe('tracker API with local D1', () => {
     ).json<{ items: Array<{ item: { id: string } }>; total: number }>();
     expect(movies.total).toBe(2);
     expect(movies.items.map(({ item }) => item.id)).toEqual([movieOne, movieTwo]);
+
+    const searched = await (
+      await request('/api/library?filter=watched&q=ted')
+    ).json<{ items: Array<{ item: { id: string } }>; total: number }>();
+    expect(searched.total).toBe(1);
+    expect(searched.items.map(({ item }) => item.id)).toEqual([movieOne]);
   });
 
   it('lists hidden shows in the library by when they were hidden', async () => {
@@ -367,6 +383,17 @@ describe('tracker API with local D1', () => {
         },
       ],
     });
+
+    const everything = await (
+      await request('/api/library?filter=watched')
+    ).json<{ items: Array<{ item: { id: string } }>; total: number }>();
+    expect(everything.total).toBe(2);
+    expect(everything.items.map(({ item }) => item.id)).toEqual(
+      expect.arrayContaining([
+        '00000000-0000-4000-8000-000000000101',
+        '00000000-0000-4000-8000-000000000102',
+      ]),
+    );
   });
 
   it('lists episode-led shows without exceeding D1 query parameter limits', async () => {
@@ -710,8 +737,10 @@ describe('tracker API with local D1', () => {
 
     const library = await (
       await request('/api/library?filter=watched')
-    ).json<{ items: Array<{ item: { posterPath: string | null } }> }>();
+    ).json<{ items: Array<{ item: { id: string; posterPath: string | null } }> }>();
 
-    expect(library.items[0]?.item.posterPath).toBe('/season-one.jpg');
+    expect(library.items.find(({ item }) => item.id === 'episode-1')?.item.posterPath).toBe(
+      '/season-one.jpg',
+    );
   });
 });

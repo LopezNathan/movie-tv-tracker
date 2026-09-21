@@ -618,6 +618,53 @@ h3 {
   justify-content: space-between;
   gap: 0.85rem;
 }
+.library-summary {
+  display: flex;
+  min-width: min(100%, 350px);
+  flex: 1 1 280px;
+  align-items: center;
+  gap: 0.85rem;
+}
+.library-search {
+  display: flex;
+  min-width: 0;
+  flex: 1;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.15rem 0.5rem;
+  border: 1px solid var(--line-bright);
+  background: var(--raised);
+}
+.library-search > svg {
+  flex: 0 0 auto;
+  color: var(--accent);
+}
+.library-search input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.45rem 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: 0.78rem;
+}
+.library-search input::placeholder {
+  color: #777266;
+}
+.library-search button {
+  display: grid;
+  flex: 0 0 auto;
+  place-items: center;
+  padding: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.library-search button:hover {
+  color: var(--ink);
+}
 .library-count {
   color: var(--muted);
   font-size: 0.72rem;

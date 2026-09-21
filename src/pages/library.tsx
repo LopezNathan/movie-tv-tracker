@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
-import { useInfiniteQuery } from '@tanstack/react-query';
+import { Search, X } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorState, LoadingState } from '../components/async-state';
 import { MediaCard } from '../components/media-card';
@@ -17,15 +18,24 @@ const filters: Array<{ value: LibraryFilter; label: string }> = [
 
 export function LibraryPage() {
   const [filter, setFilter] = useState<LibraryFilter>('all');
+  const [search, setSearch] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  useEffect(() => {
+    const timeout = window.setTimeout(() => setSearchQuery(search.trim()), 300);
+    return () => window.clearTimeout(timeout);
+  }, [search]);
+
+  const appliedSearch = filter === 'hidden' ? '' : searchQuery;
   const kind = filter === 'all' || filter === 'hidden' ? undefined : filter;
   const library = useInfiniteQuery({
-    queryKey: ['library', filter, kind],
+    queryKey: ['library', filter, kind, appliedSearch],
     queryFn: ({ pageParam }) =>
       filter === 'hidden'
         ? queries.hiddenShows(pageParam)
-        : queries.watchedLibrary(kind, pageParam),
+        : queries.watchedLibrary(kind, pageParam, appliedSearch),
     initialPageParam: null as WatchedLibraryCursor | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
+    placeholderData: keepPreviousData,
   });
 
   const items = useMemo(() => {
@@ -49,12 +59,43 @@ export function LibraryPage() {
         </p>
       </header>
 
-      {total ? (
+      {total || appliedSearch ? (
         <>
-          <div className="library-toolbar" aria-label="Filter library">
-            <span className="library-count">
-              {total} title{total === 1 ? '' : 's'}
-            </span>
+          <div className="library-toolbar">
+            <div className="library-summary">
+              <span className="library-count">
+                {total} title{total === 1 ? '' : 's'}
+                {appliedSearch ? ' found' : ''}
+              </span>
+              {filter !== 'hidden' && (
+                <label className="library-search">
+                  <Search aria-hidden="true" size={17} />
+                  <span className="sr-only">Search watched titles</span>
+                  <input
+                    type="search"
+                    value={search}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setSearch(value);
+                      if (!value) setSearchQuery('');
+                    }}
+                    placeholder="Search watched titles"
+                  />
+                  {search && (
+                    <button
+                      type="button"
+                      aria-label="Clear search"
+                      onClick={() => {
+                        setSearch('');
+                        setSearchQuery('');
+                      }}
+                    >
+                      <X aria-hidden="true" size={16} />
+                    </button>
+                  )}
+                </label>
+              )}
+            </div>
             <div className="filter-group">
               {filters.map(({ value, label }) => (
                 <button
@@ -103,11 +144,19 @@ export function LibraryPage() {
             </>
           ) : (
             <EmptyState
-              title={filter === 'hidden' ? 'No hidden shows' : `No ${filter}s watched yet`}
+              title={
+                appliedSearch
+                  ? `No watched titles match “${appliedSearch}”`
+                  : filter === 'hidden'
+                    ? 'No hidden shows'
+                    : `No ${filter}s watched yet`
+              }
             >
-              {filter === 'hidden'
-                ? 'Hover over a show in Up Next to hide it.'
-                : 'Try another filter to see more of your library.'}
+              {appliedSearch
+                ? 'Try a different title or clear your search.'
+                : filter === 'hidden'
+                  ? 'Hover over a show in Up Next to hide it.'
+                  : 'Try another filter to see more of your library.'}
             </EmptyState>
           )}
         </>
