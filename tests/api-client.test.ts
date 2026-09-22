@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { api, apiWithRetry, ApiRequestError, json } from '../src/lib/api';
+import {
+  api,
+  apiWithRetry,
+  ApiRequestError,
+  couldBeExpiredAccessSession,
+  json,
+} from '../src/lib/api';
 
 describe('API client', () => {
   afterEach(() => {
@@ -52,5 +58,13 @@ describe('API client', () => {
         status: 524,
       }),
     );
+  });
+
+  it('recognizes likely expired Cloudflare Access sessions', () => {
+    expect(couldBeExpiredAccessSession(new ApiRequestError('Unauthorized', 401))).toBe(true);
+    expect(couldBeExpiredAccessSession(new ApiRequestError('Forbidden', 403))).toBe(true);
+    expect(couldBeExpiredAccessSession(new ApiRequestError('No response', 0), true)).toBe(true);
+    expect(couldBeExpiredAccessSession(new ApiRequestError('Offline', 0), false)).toBe(false);
+    expect(couldBeExpiredAccessSession(new ApiRequestError('Bad request', 400))).toBe(false);
   });
 });

@@ -18,6 +18,11 @@ export class ApiRequestError extends Error {
   }
 }
 
+export function couldBeExpiredAccessSession(error: unknown, online = navigator.onLine) {
+  if (!(error instanceof ApiRequestError)) return false;
+  return error.status === 401 || error.status === 403 || (error.status === 0 && online);
+}
+
 type RetryOptions = {
   maxAttempts?: number;
   baseDelayMs?: number;
