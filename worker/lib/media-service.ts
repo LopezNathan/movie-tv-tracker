@@ -194,11 +194,7 @@ export async function ensureMedia(
  * fast path so an upstream refresh can never make an already-known title
  * unavailable.
  */
-export async function findSavedMedia(
-  env: Bindings,
-  kind: 'movie' | 'show',
-  tmdbId: number,
-) {
+export async function findSavedMedia(env: Bindings, kind: 'movie' | 'show', tmdbId: number) {
   const db = drizzle(env.DB);
   const saved = await db
     .select()
