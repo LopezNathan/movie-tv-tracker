@@ -704,6 +704,28 @@ describe('tracker API with local D1', () => {
     expect(episode?.posterPath).toBe('/season-one.jpg');
   });
 
+  it('returns a saved show while its stale TMDB refresh fails', async () => {
+    await seedMedia(harness.database, {
+      id: 'saved-show',
+      kind: 'show',
+      tmdbId: 125988,
+      title: 'Silo',
+      status: 'Returning Series',
+      metadataUpdatedAt: '2020-01-01T00:00:00.000Z',
+    });
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('upstream unavailable', { status: 503 })));
+
+    const response = await request('/api/media/show/125988');
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toMatchObject({ media: { title: 'Silo' } });
+    await vi.waitFor(() => expect(consoleError).toHaveBeenCalledWith(
+      'Background media refresh failed.',
+      expect.objectContaining({ kind: 'show', id: 125988 }),
+    ));
+  });
+
   it('uses season artwork for an existing episode in the watched library', async () => {
     await request('/api/health');
     await seedMedia(harness.database, {

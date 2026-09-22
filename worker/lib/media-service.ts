@@ -189,6 +189,25 @@ export async function ensureMedia(
   return saved as MediaRecord;
 }
 
+/**
+ * Returns persisted metadata without contacting TMDB. Detail pages use this
+ * fast path so an upstream refresh can never make an already-known title
+ * unavailable.
+ */
+export async function findSavedMedia(
+  env: Bindings,
+  kind: 'movie' | 'show',
+  tmdbId: number,
+) {
+  const db = drizzle(env.DB);
+  const saved = await db
+    .select()
+    .from(media)
+    .where(and(eq(media.kind, kind), eq(media.tmdbId, tmdbId)))
+    .get();
+  return saved as MediaRecord | undefined;
+}
+
 export async function ensureEpisode(
   env: Bindings,
   showTmdbId: number,

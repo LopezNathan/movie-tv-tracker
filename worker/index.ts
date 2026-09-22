@@ -30,7 +30,7 @@ import {
   tokenHash,
 } from './lib/auth';
 import { processImportBatch } from './lib/import-service';
-import { ensureMedia } from './lib/media-service';
+import { ensureMedia, findSavedMedia } from './lib/media-service';
 import { calculateProgress } from './lib/progress';
 import { getTmdbSeason, searchTmdb, TmdbError } from './lib/tmdb';
 
@@ -307,7 +307,23 @@ app.get(
   async (c) => {
     const { kind, id } = c.req.valid('param');
     const { refresh } = c.req.valid('query');
-    const item = await ensureMedia(c.env, kind, id, { force: refresh === '1' });
+    const saved = refresh === '1' ? undefined : await findSavedMedia(c.env, kind, id);
+    // A saved title is useful even while TMDB is unavailable. Refresh it after
+    // responding rather than making the detail page depend on every season
+    // request completing successfully.
+    if (saved) {
+      const refreshPromise = ensureMedia(c.env, kind, id).catch((error) => {
+        console.error('Background media refresh failed.', { kind, id, error });
+      });
+      try {
+        c.executionCtx.waitUntil(refreshPromise);
+      } catch {
+        // Hono's in-process test requests have no execution context. Starting
+        // the refresh still mirrors production behaviour closely enough there.
+        void refreshPromise;
+      }
+    }
+    const item = saved ?? (await ensureMedia(c.env, kind, id, { force: refresh === '1' }));
     const db = drizzle(c.env.DB);
     const user = c.get('user');
     const episodes =

@@ -55,10 +55,12 @@ export default defineConfig({
               request.method === 'GET' &&
               url.origin === self.location.origin &&
               /^\/api\/(dashboard|history|library|media\/)/.test(url.pathname),
-            handler: 'NetworkFirst',
+            handler: 'StaleWhileRevalidate',
             options: {
+              // Read pages should open from the last successful response,
+              // even when TMDB or the origin is temporarily unavailable. A
+              // successful network response still refreshes this cache.
               cacheName: 'scene-read-api-v1',
-              networkTimeoutSeconds: 4,
               cacheableResponse: { statuses: [0, 200] },
               expiration: { maxEntries: 80, maxAgeSeconds: 7 * 24 * 60 * 60 },
             },
