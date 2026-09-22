@@ -37,7 +37,7 @@
     "drizzle-orm": "latest",
     "fflate": "latest",
     "hono": "latest",
-    "lucide-react": "^1.45.0",
+    "lucide-react": "^1.47.0",
     "react": "latest",
     "react-dom": "latest",
     "react-router-dom": "latest",
@@ -45,7 +45,7 @@
     "zod": "latest"
   },
   "devDependencies": {
-    "@cloudflare/vite-plugin": "^1.54.8",
+    "@cloudflare/vite-plugin": "^1.56.0",
     "@cloudflare/workers-types": "^5.20260911.1",
     "@eslint/js": "latest",
     "@playwright/test": "latest",
