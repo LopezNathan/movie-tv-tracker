@@ -65,7 +65,7 @@
     "miniflare": "^5.20260911.0-alpha",
     "prettier": "latest",
     "tailwindcss": "latest",
-    "typescript": "^6.0.3",
+    "typescript": "^7.0.2",
     "typescript-eslint": "latest",
     "vite": "latest",
     "vite-plugin-pwa": "latest",
