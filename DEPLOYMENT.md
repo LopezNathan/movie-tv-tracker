@@ -44,7 +44,9 @@ Wrangler deploys the Worker and static assets to `https://scene.nathanlopez.com`
 
 ## 5. Protect the application with Cloudflare Access
 
-Cloudflare Zero Trust has a self-hosted Access application for `scene.nathanlopez.com`.
+Cloudflare Zero Trust has a self-hosted Access application for `scene.nathanlopez.com`. The
+`api.scene.nathanlopez.com` route points to the same Worker but must remain outside Access so the
+iPhone companion and signed Plex webhook URLs can reach it.
 
 1. Add a policy whose action is **Allow**.
 2. Include only the email address that should own this library.
@@ -52,6 +54,10 @@ Cloudflare Zero Trust has a self-hosted Access application for `scene.nathanlope
 4. Keep the application's **AUD tag** synchronized with `CF_ACCESS_AUD` in `wrangler.jsonc`.
 5. Keep the Zero Trust team domain synchronized with `CF_ACCESS_TEAM_DOMAIN`.
 6. Open the custom domain in a private browser window and confirm that Access challenges before Scene loads.
+
+Do not add `api.scene.nathanlopez.com` to the Access application. Keep that hostname synchronized
+with `MOBILE_API_HOST` in `wrangler.jsonc`; its mobile endpoints use bearer credentials and its Plex
+endpoint uses a generated 256-bit URL secret.
 
 The Worker validates Cloudflare's signed `Cf-Access-Jwt-Assertion` and uses the stable Access subject as `user_id`. `DEV_USER_EMAIL` is accepted only when `ENVIRONMENT=development`; never set that variable in production.
 
@@ -75,6 +81,8 @@ After Access succeeds:
 - Open `/api/health` and confirm `{"ok":true,"environment":"production"}`.
 - Search for one title to verify TMDB access.
 - Add and remove it from the watchlist to verify D1 writes.
+- In Settings, generate a Plex webhook URL, add it under Plex Account → Webhooks, and play a test
+  item past Plex's watched threshold.
 - Install the PWA and revisit the dashboard offline to verify cached read-only data.
 - Use Settings → Download JSON periodically for a portable backup.
 
@@ -83,6 +91,8 @@ For routine releases, merge or push a reviewed revision to `main` and monitor th
 ## Security notes
 
 - Never commit `.dev.vars`, `.env` files, Wrangler state, D1 files, TMDB tokens, or Trakt exports.
+- Treat generated Plex webhook URLs as credentials. Rotating or disconnecting the integration
+  invalidates the previous URL.
 - Mutations, search, and imports require a live network connection and are not queued by the service worker.
 - The PWA caches only the app shell, TMDB artwork, and successful reads for dashboard/history/library/media endpoints. Settings can clear those device-local caches.
 - This product uses the TMDB API but is not endorsed or certified by TMDB.

@@ -183,6 +183,28 @@ export const mobileSessions = sqliteTable(
   ],
 );
 
+/** Plex webhook credentials. Only the digest of the URL secret is persisted. */
+export const plexIntegrations = sqliteTable(
+  'plex_integrations',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    secretHash: text('secret_hash').notNull(),
+    plexUsername: text('plex_username').notNull(),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    lastEventAt: text('last_event_at'),
+    lastStatus: text('last_status'),
+    lastError: text('last_error'),
+  },
+  (table) => [
+    uniqueIndex('plex_integrations_user_unique').on(table.userId),
+    uniqueIndex('plex_integrations_secret_unique').on(table.secretHash),
+  ],
+);
+
 export const importRuns = sqliteTable(
   'import_runs',
   {

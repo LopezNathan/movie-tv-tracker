@@ -591,6 +591,96 @@ describe('tracker API with local D1', () => {
     expect(progress?.processedItems).toBe(1);
   });
 
+  it('configures a secret Plex webhook and idempotently records this user scrobbling a movie', async () => {
+    await seedMedia(harness.database, {
+      id: 'movie-plex',
+      kind: 'movie',
+      tmdbId: 329865,
+      title: 'Arrival',
+    });
+    const env = { ...harness.env, MOBILE_API_HOST: 'api.scene.test' };
+    const configured = await (
+      await request('/api/integrations/plex', body('PUT', { plexUsername: 'Nathan' }), env)
+    ).json<{ webhookUrl: string }>();
+    expect(configured.webhookUrl).toMatch(
+      /^https:\/\/api\.scene\.test\/api\/integrations\/plex\/webhook\/[\w-]+$/,
+    );
+
+    const payload = {
+      event: 'media.scrobble',
+      user: true,
+      Account: { title: 'nathan' },
+      Server: { uuid: 'server-1' },
+      Metadata: {
+        type: 'movie',
+        ratingKey: '42',
+        title: 'Arrival',
+        year: 2016,
+        lastViewedAt: 1_800_000_000,
+        Guid: [{ id: 'tmdb://329865' }],
+      },
+    };
+    const plexRequest = () => {
+      const form = new FormData();
+      form.set('payload', JSON.stringify(payload));
+      return app.request(configured.webhookUrl, { method: 'POST', body: form }, env);
+    };
+
+    expect((await plexRequest()).status).toBe(200);
+    expect((await plexRequest()).status).toBe(200);
+    const events = await harness.database
+      .prepare(
+        'SELECT media_id mediaId, source, watched_at watchedAt FROM watch_events ORDER BY created_at',
+      )
+      .all();
+    expect(events.results).toEqual([
+      {
+        mediaId: 'movie-plex',
+        source: 'plex',
+        watchedAt: '2027-01-15T08:00:00.000Z',
+      },
+    ]);
+    const status = await (
+      await request('/api/integrations/plex', undefined, env)
+    ).json<{ integration: { lastStatus: string } }>();
+    expect(status.integration.lastStatus).toBe('duplicate');
+  });
+
+  it('ignores Plex scrobbles from a different account', async () => {
+    await seedMedia(harness.database, {
+      id: 'movie-plex',
+      kind: 'movie',
+      tmdbId: 329865,
+      title: 'Arrival',
+    });
+    const configured = await (
+      await request('/api/integrations/plex', body('PUT', { plexUsername: 'Nathan' }))
+    ).json<{ webhookUrl: string }>();
+    const form = new FormData();
+    form.set(
+      'payload',
+      JSON.stringify({
+        event: 'media.scrobble',
+        Account: { title: 'Someone Else' },
+        Server: { uuid: 'server-1' },
+        Metadata: {
+          type: 'movie',
+          ratingKey: '42',
+          title: 'Arrival',
+          Guid: [{ id: 'tmdb://329865' }],
+        },
+      }),
+    );
+    expect(
+      (await app.request(configured.webhookUrl, { method: 'POST', body: form }, harness.env))
+        .status,
+    ).toBe(200);
+    const count = await harness.database
+      .prepare('SELECT count(*) count FROM watch_events')
+      .first<{ count: number }>();
+    expect(count?.count).toBe(0);
+  });
+
   it('hydrates only the requested episode while importing history', async () => {
     const fetchMock = vi.fn(async (input: string | URL | Request) => {
       const url = String(input);

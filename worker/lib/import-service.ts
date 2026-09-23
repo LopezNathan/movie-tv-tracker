@@ -114,9 +114,34 @@ async function resolveEpisode(env: Bindings, item: NormalizedImportItem): Promis
   return episode ? { mediaId: episode.id } : { reason: 'unresolved' };
 }
 
-async function resolveItem(env: Bindings, item: NormalizedImportItem) {
+export async function resolveItem(env: Bindings, item: NormalizedImportItem) {
   if (item.kind === 'episode') return resolveEpisode(env, item);
   return resolveTitle(env, item, item.kind);
+}
+
+export async function recordResolvedWatch(
+  env: Bindings,
+  userId: string,
+  item: NormalizedImportItem,
+  source: string,
+) {
+  const resolution = await resolveItem(env, item);
+  if (!resolution.mediaId) return resolution;
+  const now = new Date().toISOString();
+  const inserted = await drizzle(env.DB)
+    .insert(watchEvents)
+    .values({
+      id: crypto.randomUUID(),
+      userId,
+      mediaId: resolution.mediaId,
+      watchedAt: item.watchedAt ?? now,
+      source,
+      sourceEventKey: item.sourceEventId ?? item.fingerprint,
+      createdAt: now,
+    })
+    .onConflictDoNothing()
+    .returning({ id: watchEvents.id });
+  return { mediaId: resolution.mediaId, inserted: inserted.length > 0 };
 }
 
 async function applyItem(

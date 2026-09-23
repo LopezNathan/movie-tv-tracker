@@ -16,6 +16,7 @@ import {
   listEntries,
   media,
   mobileSessions,
+  plexIntegrations,
   ratings,
   upNextExclusions,
   watchEvents,
@@ -29,8 +30,9 @@ import {
   rotateMobileSession,
   tokenHash,
 } from './lib/auth';
-import { processImportBatch } from './lib/import-service';
+import { processImportBatch, recordResolvedWatch } from './lib/import-service';
 import { ensureMedia, findSavedMedia } from './lib/media-service';
+import { normalizePlexScrobble, parsePlexWebhook, plexAccountTitle } from './lib/plex';
 import { calculateProgress } from './lib/progress';
 import { getTmdbSeason, searchTmdb, TmdbError } from './lib/tmdb';
 
@@ -124,6 +126,90 @@ function requireBrowserHost(c: { req: { url: string }; env: AppEnv['Bindings'] }
   }
 }
 
+function opaqueSecret() {
+  const bytes = crypto.getRandomValues(new Uint8Array(32));
+  return btoa(String.fromCharCode(...bytes))
+    .replaceAll('+', '-')
+    .replaceAll('/', '_')
+    .replaceAll('=', '');
+}
+
+function plexWebhookUrl(c: { req: { url: string }; env: AppEnv['Bindings'] }, secret: string) {
+  const requestUrl = new URL(c.req.url);
+  const origin = c.env.MOBILE_API_HOST ? `https://${c.env.MOBILE_API_HOST}` : requestUrl.origin;
+  return `${origin}/api/integrations/plex/webhook/${secret}`;
+}
+
+// Plex cannot authenticate through Cloudflare Access, so this route uses a
+// per-user, high-entropy URL secret and lives on the unprotected API hostname.
+app.post('/api/integrations/plex/webhook/:secret', async (c) => {
+  if (c.env.MOBILE_API_HOST) requireMobileHost(c);
+  const db = drizzle(c.env.DB);
+  const integration = await db
+    .select()
+    .from(plexIntegrations)
+    .where(eq(plexIntegrations.secretHash, await tokenHash(c.req.param('secret'))))
+    .get();
+  if (!integration) throw new HTTPException(404, { message: 'Plex integration not found.' });
+
+  let payload;
+  try {
+    payload = await parsePlexWebhook(c.req.raw);
+  } catch (error) {
+    throw new HTTPException(400, {
+      message: error instanceof Error ? error.message : 'Invalid Plex webhook.',
+    });
+  }
+
+  if (payload.event !== 'media.scrobble') return c.json({ ok: true, ignored: true });
+  const account = plexAccountTitle(payload);
+  if (!account || account.toLocaleLowerCase() !== integration.plexUsername.toLocaleLowerCase()) {
+    return c.json({ ok: true, ignored: true });
+  }
+
+  const now = new Date();
+  const item = normalizePlexScrobble(payload, now);
+  if (!item) {
+    await db
+      .update(plexIntegrations)
+      .set({
+        lastEventAt: now.toISOString(),
+        lastStatus: 'ignored',
+        lastError: 'The event was not a supported movie or episode.',
+        updatedAt: now.toISOString(),
+      })
+      .where(eq(plexIntegrations.id, integration.id));
+    return c.json({ ok: true, ignored: true });
+  }
+
+  try {
+    const result = await recordResolvedWatch(c.env, integration.userId, item, 'plex');
+    const matched = Boolean(result.mediaId);
+    const imported = 'inserted' in result && result.inserted;
+    await db
+      .update(plexIntegrations)
+      .set({
+        lastEventAt: now.toISOString(),
+        lastStatus: matched ? (imported ? 'imported' : 'duplicate') : 'unmatched',
+        lastError: matched ? null : 'Scene could not match this Plex item to TMDB.',
+        updatedAt: now.toISOString(),
+      })
+      .where(eq(plexIntegrations.id, integration.id));
+    return c.json({ ok: matched, imported }, matched ? 200 : 202);
+  } catch (error) {
+    await db
+      .update(plexIntegrations)
+      .set({
+        lastEventAt: now.toISOString(),
+        lastStatus: 'error',
+        lastError: error instanceof Error ? error.message.slice(0, 500) : 'Unexpected error.',
+        updatedAt: now.toISOString(),
+      })
+      .where(eq(plexIntegrations.id, integration.id));
+    throw error;
+  }
+});
+
 // This endpoint stays on the Access-protected browser host. The app opens it in
 // ASWebAuthenticationSession, then receives only a short-lived, single-use code.
 app.get('/api/mobile/pair', requireUser, async (c) => {
@@ -197,6 +283,76 @@ app.delete('/api/mobile/sessions/current', async (c) => {
 });
 
 app.get('/api/me', (c) => c.json({ user: c.get('user') }));
+
+app.get('/api/integrations/plex', async (c) => {
+  const integration = await drizzle(c.env.DB)
+    .select({
+      plexUsername: plexIntegrations.plexUsername,
+      createdAt: plexIntegrations.createdAt,
+      lastEventAt: plexIntegrations.lastEventAt,
+      lastStatus: plexIntegrations.lastStatus,
+      lastError: plexIntegrations.lastError,
+    })
+    .from(plexIntegrations)
+    .where(eq(plexIntegrations.userId, c.get('user').id))
+    .get();
+  return c.json({ integration: integration ?? null });
+});
+
+app.put(
+  '/api/integrations/plex',
+  zValidator('json', z.object({ plexUsername: z.string().trim().min(1).max(100) })),
+  async (c) => {
+    const db = drizzle(c.env.DB);
+    const secret = opaqueSecret();
+    const now = new Date().toISOString();
+    const values = {
+      id: crypto.randomUUID(),
+      userId: c.get('user').id,
+      secretHash: await tokenHash(secret),
+      plexUsername: c.req.valid('json').plexUsername,
+      createdAt: now,
+      updatedAt: now,
+      lastEventAt: null,
+      lastStatus: null,
+      lastError: null,
+    };
+    await db
+      .insert(plexIntegrations)
+      .values(values)
+      .onConflictDoUpdate({
+        target: plexIntegrations.userId,
+        set: {
+          secretHash: values.secretHash,
+          plexUsername: values.plexUsername,
+          updatedAt: now,
+          lastEventAt: null,
+          lastStatus: null,
+          lastError: null,
+        },
+      });
+    return c.json(
+      {
+        integration: {
+          plexUsername: values.plexUsername,
+          createdAt: now,
+          lastEventAt: null,
+          lastStatus: null,
+          lastError: null,
+        },
+        webhookUrl: plexWebhookUrl(c, secret),
+      },
+      201,
+    );
+  },
+);
+
+app.delete('/api/integrations/plex', async (c) => {
+  await drizzle(c.env.DB)
+    .delete(plexIntegrations)
+    .where(eq(plexIntegrations.userId, c.get('user').id));
+  return c.body(null, 204);
+});
 
 app.get(
   '/api/search',

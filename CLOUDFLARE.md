@@ -5,16 +5,20 @@ This deployment publishes the local Docker application at a Cloudflare-managed h
 ## Cloudflare configuration
 
 1. Create a remotely managed Cloudflare Tunnel and copy its connector token.
-2. Add a public hostname that maps `scene.nathanlopez.com` to `http://scene:8787`.
+2. Add public hostnames for both `scene.nathanlopez.com` and `api.scene.nathanlopez.com`; map both
+   to `http://scene:8787`.
 3. Create a self-hosted Access application for `scene.nathanlopez.com`.
 4. Add an Allow policy containing only the Scene owner's email address.
 5. Copy the Access team domain and application AUD tag into `.env` along with the tunnel token.
+   Keep the API hostname outside the Access application; mobile bearer authentication and Plex's
+   generated webhook secret protect its exposed routes.
 
 ```dotenv
 AUTH_MODE=cloudflare-access
 CF_TUNNEL_TOKEN=replace-with-the-tunnel-token
 CF_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
 CF_ACCESS_AUD=replace-with-the-application-aud-tag
+MOBILE_API_HOST=api.scene.nathanlopez.com
 ```
 
 Start the Cloudflare deployment:

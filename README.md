@@ -13,6 +13,7 @@ Scene is an installable movie and TV tracker for keeping a personal record of wh
 - Browse a chronological watch history and a filterable library of watched movies, shows, and episodes.
 - See recently watched titles, watchlist picks, statistics, and the next aired episode for in-progress shows on the dashboard.
 - Import watch history, ratings, and watchlist items from a Trakt account-export ZIP; unmatched records remain available for review.
+- Automatically record movies and episodes from Plex when Plex marks them watched.
 - Download a versioned JSON backup of your library, watches, ratings, and watchlist.
 - Install as a PWA with offline access to the app shell, recently viewed pages, and artwork.
 
@@ -73,3 +74,15 @@ The native iOS 17+ companion lives in [ios/Scene](./ios/Scene). Open `Scene.xcod
 Before distributing, deploy migration `0003_mobile_sessions.sql`, point `api.scene.nathanlopez.com` at this same Worker, and set `MOBILE_API_HOST=api.scene.nathanlopez.com`. Keep Cloudflare Access on `scene.nathanlopez.com` only: the API hostname must be outside Access. The app opens the protected browser host to pair, then uses a five-minute single-use handoff code to obtain revocable opaque bearer credentials. Access and refresh tokens are never stored in D1, only SHA-256 digests; the app stores the credential pair in Keychain.
 
 The app caches successful reads locally for offline viewing and identifies stale content. It intentionally never queues writes while offline.
+
+## Plex tracking
+
+Open **Settings → Automatic Plex tracking**, enter the username shown on your Plex account,
+and copy the generated URL into **Plex Web → Settings → Account → Webhooks**. Plex sends a
+`media.scrobble` event after a movie or episode passes its watched threshold; Scene matches its
+Plex metadata to TMDB and records the watch once. Webhooks currently require Plex Pass.
+
+On Cloudflare deployments, `MOBILE_API_HOST` must point to the same Worker on a hostname that is
+not protected by Cloudflare Access. Scene protects the webhook with a generated 256-bit secret and
+stores only its SHA-256 digest. On a private Tailscale deployment, the Plex server must be able to
+reach Scene's tailnet URL.

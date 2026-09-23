@@ -34,6 +34,10 @@ Open `https://scene.<your-tailnet>.ts.net` (or the fully qualified MagicDNS host
 
 On the Docker host, Scene is also available directly at `http://127.0.0.1:8787`.
 
+To enable automatic Plex tracking, open Scene Settings and generate a webhook URL, then add it in
+Plex Web under Settings → Account → Webhooks. The Plex server must be logged into the same tailnet
+and able to resolve and reach Scene's HTTPS MagicDNS name. Plex webhooks require Plex Pass.
+
 ## Data and upgrades
 
 The `scene-data` volume contains the local D1 state. Migrations run automatically before every start and are safe to re-run. The `tailscale-state` volume contains the Tailscale node identity.
