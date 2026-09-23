@@ -86,3 +86,7 @@ On Cloudflare deployments, `MOBILE_API_HOST` must point to the same Worker on a 
 not protected by Cloudflare Access. Scene protects the webhook with a generated 256-bit secret and
 stores only its SHA-256 digest. On a private Tailscale deployment, the Plex server must be able to
 reach Scene's tailnet URL.
+
+Set `BROWSER_APP_HOST` to the Access-protected hostname. Requests for browser pages on the API
+hostname are redirected there, while authenticated mobile endpoints and signed Plex webhooks remain
+available to their non-browser clients.

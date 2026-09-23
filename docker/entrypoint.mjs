@@ -57,6 +57,7 @@ const bindings = {
         CF_ACCESS_AUD: process.env.CF_ACCESS_AUD,
         CF_ACCESS_JWKS_B64: accessJwks,
         ...(process.env.MOBILE_API_HOST ? { MOBILE_API_HOST: process.env.MOBILE_API_HOST } : {}),
+        ...(process.env.BROWSER_APP_HOST ? { BROWSER_APP_HOST: process.env.BROWSER_APP_HOST } : {}),
       }
     : { APP_USER_EMAIL: process.env.APP_USER_EMAIL }),
 };

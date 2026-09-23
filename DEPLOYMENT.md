@@ -59,6 +59,10 @@ Do not add `api.scene.nathanlopez.com` to the Access application. Keep that host
 with `MOBILE_API_HOST` in `wrangler.jsonc`; its mobile endpoints use bearer credentials and its Plex
 endpoint uses a generated 256-bit URL secret.
 
+Keep `BROWSER_APP_HOST` set to the Access-protected hostname. Scene routes all requests through the
+Worker first so accidental browser navigation to the API hostname is redirected there; the API
+hostname never serves the application shell.
+
 The Worker validates Cloudflare's signed `Cf-Access-Jwt-Assertion` and uses the stable Access subject as `user_id`. `DEV_USER_EMAIL` is accepted only when `ENVIRONMENT=development`; never set that variable in production.
 
 ## 6. Deploy from GitHub Actions

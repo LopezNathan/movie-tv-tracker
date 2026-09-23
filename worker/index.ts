@@ -39,6 +39,29 @@ import { getTmdbSeason, searchTmdb, TmdbError } from './lib/tmdb';
 const app = new Hono<AppEnv>();
 const seasonPosterCache = new Map<string, string | null>();
 
+// The API hostname deliberately bypasses Cloudflare Access for mobile bearer
+// sessions and signed Plex webhooks. Never serve the browser app there: send
+// navigations to the Access-protected hostname before static assets can run.
+app.use('*', async (c, next) => {
+  const url = new URL(c.req.url);
+  const mobileHost = c.env.MOBILE_API_HOST?.toLowerCase();
+  if (
+    mobileHost &&
+    url.hostname.toLowerCase() === mobileHost &&
+    !url.pathname.startsWith('/api/')
+  ) {
+    const browserHost = c.env.BROWSER_APP_HOST?.trim().toLowerCase();
+    if (!browserHost || browserHost === mobileHost) {
+      throw new HTTPException(404, { message: 'Not found.' });
+    }
+    url.protocol = 'https:';
+    url.hostname = browserHost;
+    url.port = '';
+    return c.redirect(url.toString(), 307);
+  }
+  await next();
+});
+
 async function getSeasonPoster(env: AppEnv['Bindings'], show: MediaRecord, seasonNumber: number) {
   const key = `${show.id}:${seasonNumber}`;
   if (seasonPosterCache.has(key)) return seasonPosterCache.get(key) ?? null;
@@ -1234,7 +1257,11 @@ app.get('/api/export.json', async (c) => {
   });
 });
 
-app.notFound((c) => c.json({ error: 'Not found.' }, 404));
+app.notFound((c) => {
+  const path = new URL(c.req.url).pathname;
+  if (!path.startsWith('/api/') && c.env.ASSETS) return c.env.ASSETS.fetch(c.req.raw);
+  return c.json({ error: 'Not found.' }, 404);
+});
 app.onError((error, c) => {
   if (error instanceof HTTPException) return c.json({ error: error.message }, error.status);
   if (error instanceof TmdbError) {

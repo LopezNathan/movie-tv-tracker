@@ -9,6 +9,7 @@ services:
       CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN:-}
       CF_ACCESS_AUD: ${CF_ACCESS_AUD:-}
       MOBILE_API_HOST: ${MOBILE_API_HOST:-}
+      BROWSER_APP_HOST: ${BROWSER_APP_HOST:-}
     volumes:
       - scene-data:/data
     ports:

@@ -19,6 +19,7 @@ CF_TUNNEL_TOKEN=replace-with-the-tunnel-token
 CF_ACCESS_TEAM_DOMAIN=your-team.cloudflareaccess.com
 CF_ACCESS_AUD=replace-with-the-application-aud-tag
 MOBILE_API_HOST=api.scene.nathanlopez.com
+BROWSER_APP_HOST=scene.nathanlopez.com
 ```
 
 Start the Cloudflare deployment:

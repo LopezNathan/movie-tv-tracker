@@ -25,6 +25,37 @@ afterEach(async () => {
 });
 
 describe('tracker API with local D1', () => {
+  it('redirects browser pages away from the unprotected API hostname', async () => {
+    const env = {
+      ...harness.env,
+      MOBILE_API_HOST: 'api.scene.test',
+      BROWSER_APP_HOST: 'scene.test',
+    };
+    const response = await app.request('https://api.scene.test/settings?from=api', undefined, env);
+
+    expect(response.status).toBe(307);
+    expect(response.headers.get('Location')).toBe('https://scene.test/settings?from=api');
+  });
+
+  it('does not redirect explicit API routes on the API hostname', async () => {
+    const response = await app.request('https://api.scene.test/api/health', undefined, {
+      ...harness.env,
+      MOBILE_API_HOST: 'api.scene.test',
+      BROWSER_APP_HOST: 'scene.test',
+    });
+
+    expect(response.status).toBe(200);
+  });
+
+  it('does not serve browser pages on the API hostname without a redirect target', async () => {
+    const response = await app.request('https://api.scene.test/settings', undefined, {
+      ...harness.env,
+      MOBILE_API_HOST: 'api.scene.test',
+    });
+
+    expect(response.status).toBe(404);
+  });
+
   it('creates a user once without mutating it on a matching subsequent request', async () => {
     await harness.database
       .prepare(
