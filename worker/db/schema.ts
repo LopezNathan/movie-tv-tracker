@@ -36,6 +36,7 @@ export const media = sqliteTable(
     episodeNumber: integer('episode_number'),
     airDate: text('air_date'),
     metadataUpdatedAt: text('metadata_updated_at').notNull(),
+    episodesUpdatedAt: text('episodes_updated_at'),
     createdAt: text('created_at').notNull(),
   },
   (table) => [

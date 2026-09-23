@@ -12,9 +12,7 @@ function yearFrom(value?: string) {
 function isStale(item: typeof media.$inferSelect, now = Date.now()) {
   const age = now - new Date(item.metadataUpdatedAt).getTime();
   const day = 86_400_000;
-  if (item.kind === 'show' && item.status !== 'Ended' && item.status !== 'Canceled')
-    return age > day;
-  if (item.kind === 'show') return age > 30 * day;
+  if (item.kind === 'show') return age > day;
   return age > 365 * day;
 }
 
@@ -150,7 +148,12 @@ export async function ensureMedia(
     .where(and(eq(media.kind, kind), eq(media.tmdbId, tmdbId)))
     .get();
 
-  if (existing && !force && !isStale(existing)) return existing as MediaRecord;
+  const needsEpisodes =
+    kind === 'show' &&
+    shouldHydrateEpisodes &&
+    (!existing?.episodesUpdatedAt ||
+      Date.now() - new Date(existing.episodesUpdatedAt).getTime() > 86_400_000);
+  if (existing && !force && !isStale(existing) && !needsEpisodes) return existing as MediaRecord;
 
   const detail = await getTmdbDetails(env, kind, tmdbId);
   const now = new Date().toISOString();
@@ -184,7 +187,11 @@ export async function ensureMedia(
   if (!saved) throw new Error('Media metadata could not be saved.');
 
   if (kind === 'show' && shouldHydrateEpisodes) {
+    // A failed or partial refresh must remain retryable even though the show's
+    // own metadata has already been saved successfully.
+    await db.update(media).set({ episodesUpdatedAt: null }).where(eq(media.id, saved.id));
     await hydrateEpisodes(env, saved, detail.number_of_seasons ?? 0);
+    await db.update(media).set({ episodesUpdatedAt: now }).where(eq(media.id, saved.id));
   }
   return saved as MediaRecord;
 }

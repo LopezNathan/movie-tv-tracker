@@ -60,6 +60,7 @@ export async function seedMedia(
     airDate?: string | null;
     status?: string;
     metadataUpdatedAt?: string;
+    episodesUpdatedAt?: string | null;
   },
 ) {
   const now = new Date().toISOString();
@@ -67,8 +68,8 @@ export async function seedMedia(
     .prepare(
       `INSERT INTO media (
         id, kind, tmdb_id, title, series_id, season_number, episode_number, air_date,
-        status, metadata_updated_at, created_at
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        status, metadata_updated_at, created_at, episodes_updated_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     )
     .bind(
       values.id,
@@ -82,6 +83,7 @@ export async function seedMedia(
       values.status ?? null,
       values.metadataUpdatedAt ?? now,
       now,
+      values.episodesUpdatedAt === undefined ? now : values.episodesUpdatedAt,
     )
     .run();
 }
