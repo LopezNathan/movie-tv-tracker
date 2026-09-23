@@ -186,7 +186,12 @@ app.post('/api/integrations/plex/webhook/:secret', async (c) => {
 
   if (payload.event !== 'media.scrobble') return c.json({ ok: true, ignored: true });
   const account = plexAccountTitle(payload);
-  if (!account || account.toLocaleLowerCase() !== integration.plexUsername.toLocaleLowerCase()) {
+  const belongsToConfiguredUser =
+    payload.user === true ||
+    (payload.user === undefined &&
+      Boolean(integration.plexUsername) &&
+      account?.toLocaleLowerCase() === integration.plexUsername.toLocaleLowerCase());
+  if (!belongsToConfiguredUser) {
     return c.json({ ok: true, ignored: true });
   }
 
@@ -310,7 +315,6 @@ app.get('/api/me', (c) => c.json({ user: c.get('user') }));
 app.get('/api/integrations/plex', async (c) => {
   const integration = await drizzle(c.env.DB)
     .select({
-      plexUsername: plexIntegrations.plexUsername,
       createdAt: plexIntegrations.createdAt,
       lastEventAt: plexIntegrations.lastEventAt,
       lastStatus: plexIntegrations.lastStatus,
@@ -324,16 +328,21 @@ app.get('/api/integrations/plex', async (c) => {
 
 app.put(
   '/api/integrations/plex',
-  zValidator('json', z.object({ plexUsername: z.string().trim().min(1).max(100) })),
+  zValidator('json', z.object({ plexUsername: z.string().trim().max(100).optional() })),
   async (c) => {
     const db = drizzle(c.env.DB);
+    const existing = await db
+      .select({ plexUsername: plexIntegrations.plexUsername })
+      .from(plexIntegrations)
+      .where(eq(plexIntegrations.userId, c.get('user').id))
+      .get();
     const secret = opaqueSecret();
     const now = new Date().toISOString();
     const values = {
       id: crypto.randomUUID(),
       userId: c.get('user').id,
       secretHash: await tokenHash(secret),
-      plexUsername: c.req.valid('json').plexUsername,
+      plexUsername: c.req.valid('json').plexUsername ?? existing?.plexUsername ?? '',
       createdAt: now,
       updatedAt: now,
       lastEventAt: null,
@@ -357,7 +366,6 @@ app.put(
     return c.json(
       {
         integration: {
-          plexUsername: values.plexUsername,
           createdAt: now,
           lastEventAt: null,
           lastStatus: null,

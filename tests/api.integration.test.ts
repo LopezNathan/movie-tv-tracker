@@ -631,7 +631,7 @@ describe('tracker API with local D1', () => {
     });
     const env = { ...harness.env, MOBILE_API_HOST: 'api.scene.test' };
     const configured = await (
-      await request('/api/integrations/plex', body('PUT', { plexUsername: 'Nathan' }), env)
+      await request('/api/integrations/plex', body('PUT', {}), env)
     ).json<{ webhookUrl: string }>();
     expect(configured.webhookUrl).toMatch(
       /^https:\/\/api\.scene\.test\/api\/integrations\/plex\/webhook\/[\w-]+$/,
@@ -640,7 +640,7 @@ describe('tracker API with local D1', () => {
     const payload = {
       event: 'media.scrobble',
       user: true,
-      Account: { title: 'nathan' },
+      Account: { title: 'Nathan Display Name' },
       Server: { uuid: 'server-1' },
       Metadata: {
         type: 'movie',
@@ -677,7 +677,7 @@ describe('tracker API with local D1', () => {
     expect(status.integration.lastStatus).toBe('duplicate');
   });
 
-  it('ignores Plex scrobbles from a different account', async () => {
+  it('ignores Plex scrobbles that Plex identifies as belonging to another user', async () => {
     await seedMedia(harness.database, {
       id: 'movie-plex',
       kind: 'movie',
@@ -692,7 +692,9 @@ describe('tracker API with local D1', () => {
       'payload',
       JSON.stringify({
         event: 'media.scrobble',
-        Account: { title: 'Someone Else' },
+        user: false,
+        owner: true,
+        Account: { title: 'Nathan' },
         Server: { uuid: 'server-1' },
         Metadata: {
           type: 'movie',

@@ -16,7 +16,6 @@ import { useState } from 'react';
 import { api, json } from '../lib/api';
 
 type PlexIntegration = {
-  plexUsername: string;
   createdAt: string;
   lastEventAt: string | null;
   lastStatus: string | null;
@@ -25,7 +24,6 @@ type PlexIntegration = {
 
 export function SettingsPage() {
   const [cleared, setCleared] = useState(false);
-  const [plexUsername, setPlexUsername] = useState('');
   const [webhookUrl, setWebhookUrl] = useState('');
   const [plexBusy, setPlexBusy] = useState(false);
   const [plexError, setPlexError] = useState('');
@@ -43,21 +41,15 @@ export function SettingsPage() {
   }
 
   async function configurePlex() {
-    const username = plexUsername.trim() || plex.data?.integration?.plexUsername;
-    if (!username) {
-      setPlexError('Enter the Plex username shown in your Plex account.');
-      return;
-    }
     setPlexBusy(true);
     setPlexError('');
     setCopied(false);
     try {
       const result = await api<{ integration: PlexIntegration; webhookUrl: string }>(
         '/api/integrations/plex',
-        json('PUT', { plexUsername: username }),
+        json('PUT', {}),
       );
       setWebhookUrl(result.webhookUrl);
-      setPlexUsername('');
       await plex.refetch();
     } catch (error) {
       setPlexError(error instanceof Error ? error.message : 'Could not configure Plex.');
@@ -108,14 +100,14 @@ export function SettingsPage() {
         <div className="grow">
           <h2>Automatic Plex tracking</h2>
           <p>
-            Record movies and episodes when Plex marks them watched. Events from other Plex users
-            are ignored.
+            Record movies and episodes when Plex marks them watched. Plex identifies which events
+            belong to you, so events from other users are ignored.
           </p>
           {integration ? (
             <div className="integration-status">
               <span className="status-dot" aria-hidden="true" />
               <span>
-                Connected for <strong>{integration.plexUsername}</strong>
+                Connected
                 {integration.lastEventAt
                   ? ` · Last event ${new Date(integration.lastEventAt).toLocaleString()}`
                   : ' · Waiting for the first event'}
@@ -129,15 +121,6 @@ export function SettingsPage() {
             </p>
           ) : null}
           <div className="plex-controls">
-            <label>
-              Plex username
-              <input
-                value={plexUsername}
-                onChange={(event) => setPlexUsername(event.target.value)}
-                placeholder={integration?.plexUsername ?? 'Your Plex username'}
-                disabled={plexBusy || plex.isLoading}
-              />
-            </label>
             <button
               className="button primary"
               disabled={plexBusy || plex.isLoading}

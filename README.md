@@ -77,8 +77,8 @@ The app caches successful reads locally for offline viewing and identifies stale
 
 ## Plex tracking
 
-Open **Settings → Automatic Plex tracking**, enter the username shown on your Plex account,
-and copy the generated URL into **Plex Web → Settings → Account → Webhooks**. Plex sends a
+Open **Settings → Automatic Plex tracking**, connect Plex, and copy the generated URL into
+**Plex Web → Settings → Account → Webhooks**. Plex sends a
 `media.scrobble` event after a movie or episode passes its watched threshold; Scene matches its
 Plex metadata to TMDB and records the watch once. Webhooks currently require Plex Pass.
 
