@@ -81,8 +81,8 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       isOnline
         ? 'The request could not reach the server. Your session may have expired.'
         : method === 'GET'
-            ? 'This page is not available offline yet.'
-            : 'The request was interrupted. Check your connection and try again.',
+          ? 'This page is not available offline yet.'
+          : 'The request was interrupted. Check your connection and try again.',
       0,
     );
   }
