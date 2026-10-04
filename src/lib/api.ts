@@ -76,10 +76,13 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
       },
     });
   } catch {
+    const isOnline = navigator.onLine;
     throw new ApiRequestError(
-      method === 'GET'
-        ? 'This page is not available offline yet.'
-        : 'The request was interrupted. Check your connection and try again.',
+      isOnline
+        ? 'The request could not reach the server. Your session may have expired.'
+        : method === 'GET'
+            ? 'This page is not available offline yet.'
+            : 'The request was interrupted. Check your connection and try again.',
       0,
     );
   }
@@ -94,7 +97,17 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     );
   }
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  // Cloudflare Access can return an HTML login page (200 OK) when the session
+  // expires. Detect a non-JSON response and treat it as a session failure.
+  const text = await response.text();
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    throw new ApiRequestError(
+      'The API returned an unexpected page. Your session may have expired.',
+      0,
+    );
+  }
 }
 
 export async function apiWithRetry<T>(
