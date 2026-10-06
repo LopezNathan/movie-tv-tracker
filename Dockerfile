@@ -1,4 +1,4 @@
-FROM node:26.8.2-bookworm-slim AS base
+FROM node:26.10.0-bookworm-slim AS base
 
 RUN npm install --global npm@12.0.2
 
