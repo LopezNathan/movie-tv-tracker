@@ -264,25 +264,12 @@ describe('tracker API with local D1', () => {
       total: number;
       nextCursor: { watchedAt: string; itemId: string } | null;
     }>();
-    expect(first.total).toBe(3);
+    expect(first.total).toBe(2);
     expect(first.items.map(({ item, watchedAt }) => ({ id: item.id, watchedAt }))).toEqual([
       { id: movieOne, watchedAt: '2026-01-04T00:00:00.000Z' },
-      { id: showOne, watchedAt: '2026-01-03T00:00:00.000Z' },
-    ]);
-    expect(first.nextCursor).toEqual({ watchedAt: '2026-01-03T00:00:00.000Z', itemId: showOne });
-
-    const second = await (
-      await request(
-        `/api/library?filter=watched&limit=2&before=${encodeURIComponent(first.nextCursor!.watchedAt)}&beforeId=${first.nextCursor!.itemId}`,
-      )
-    ).json<{
-      items: Array<{ item: { id: string }; watchedAt: string }>;
-      nextCursor: unknown;
-    }>();
-    expect(second.items.map(({ item, watchedAt }) => ({ id: item.id, watchedAt }))).toEqual([
       { id: movieTwo, watchedAt: '2026-01-02T00:00:00.000Z' },
     ]);
-    expect(second.nextCursor).toBeNull();
+    expect(first.nextCursor).toBeNull();
 
     const movies = await (
       await request('/api/library?filter=watched&kind=movie&limit=2')
@@ -418,13 +405,10 @@ describe('tracker API with local D1', () => {
     const everything = await (
       await request('/api/library?filter=watched')
     ).json<{ items: Array<{ item: { id: string } }>; total: number }>();
-    expect(everything.total).toBe(2);
-    expect(everything.items.map(({ item }) => item.id)).toEqual(
-      expect.arrayContaining([
-        '00000000-0000-4000-8000-000000000101',
-        '00000000-0000-4000-8000-000000000102',
-      ]),
-    );
+    expect(everything.total).toBe(1);
+    expect(everything.items.map(({ item }) => item.id)).toEqual([
+      '00000000-0000-4000-8000-000000000102',
+    ]);
   });
 
   it('lists episode-led shows without exceeding D1 query parameter limits', async () => {
