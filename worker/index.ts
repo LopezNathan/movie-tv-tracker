@@ -785,7 +785,7 @@ app.get(
           : watchedRows
               .filter(({ item }) => item.kind !== 'show')
               .map(({ item, watchedAt }) => ({ item: item as MediaRecord, watchedAt }))),
-        ...watchedShows.values(),
+        ...(kind === 'show' ? watchedShows.values() : []),
       ].filter((row) => titleMatchesSearch(row.item.title, q));
       const ordered = matchingItems
         .sort(
