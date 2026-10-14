@@ -32,7 +32,7 @@ type RetryOptions = {
 export type WatchedLibraryCursor = { watchedAt: string; itemId: string };
 
 export type LibraryPage = {
-  items: Array<{ item: MediaRecord; watchedAt?: string; hiddenAt?: string }>;
+  items: Array<{ item: MediaRecord; show?: MediaRecord; watchedAt?: string; hiddenAt?: string }>;
   total: number;
   nextCursor: WatchedLibraryCursor | null;
 };

@@ -27,7 +27,12 @@ export function WatchHistoryCard({ event, onUndo, undoDisabled }: WatchHistoryCa
       </div>
       <div className="media-card-copy watch-history-card-copy">
         <strong>{title}</strong>
-        {isEpisode && show && <span>{media.title}</span>}
+        {isEpisode && (
+          <span>
+            {episodeCode(media)}
+            {show ? ` · ${media.title}` : ''}
+          </span>
+        )}
         <span>{formatDate(event.watchedAt)}</span>
       </div>
     </>

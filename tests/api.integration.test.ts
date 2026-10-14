@@ -536,6 +536,71 @@ describe('tracker API with local D1', () => {
     expect(restored.upNext.map(({ show }) => show.id)).toContain('show-1');
   });
 
+  it('clears watch history for a show and its episodes from the library', async () => {
+    await request('/api/health');
+    await seedMedia(harness.database, { id: 'show-1', kind: 'show', tmdbId: 10, title: 'Show' });
+    await seedMedia(harness.database, {
+      id: 'ep-1',
+      kind: 'episode',
+      tmdbId: 11,
+      title: 'One',
+      seriesId: 'show-1',
+      seasonNumber: 1,
+      episodeNumber: 1,
+      airDate: '2020-01-01',
+    });
+    await request('/api/watch-events', body('POST', { mediaId: 'ep-1' }));
+    const shows = async () =>
+      (
+        await (
+          await request('/api/library?filter=watched&kind=show')
+        ).json<{
+          items: Array<{ item: { id: string } }>;
+        }>()
+      ).items.map(({ item }) => item.id);
+    expect(await shows()).toEqual(['show-1']);
+
+    const cleared = await request('/api/watch-history/show-1', { method: 'DELETE' });
+    expect(cleared.status).toBe(200);
+    expect(await cleared.json()).toEqual({ deleted: 1 });
+    expect(await shows()).toEqual([]);
+    expect((await request('/api/watch-history/show-1', { method: 'DELETE' })).status).toBe(404);
+  });
+
+  it('attaches the parent show to library and dashboard episode rows', async () => {
+    await request('/api/health');
+    await seedMedia(harness.database, { id: 'show-1', kind: 'show', tmdbId: 10, title: 'Show' });
+    await seedMedia(harness.database, {
+      id: 'ep-1',
+      kind: 'episode',
+      tmdbId: 11,
+      title: 'One',
+      seriesId: 'show-1',
+      seasonNumber: 2,
+      episodeNumber: 3,
+      airDate: '2020-01-01',
+    });
+    await request('/api/watch-events', body('POST', { mediaId: 'ep-1' }));
+    type Row = { item: { id: string }; show?: { id: string; tmdbId: number } };
+
+    for (const query of ['kind=episode', '']) {
+      const library = await (
+        await request(`/api/library?filter=watched&${query}`)
+      ).json<{ items: Row[] }>();
+      const row = library.items.find(({ item }) => item.id === 'ep-1');
+      expect(row?.show).toMatchObject({ id: 'show-1', tmdbId: 10 });
+    }
+
+    const dashboard = await (
+      await request('/api/dashboard')
+    ).json<{
+      recent: Array<{ media: { id: string }; show?: { id: string }; seasonPosterPath?: unknown }>;
+    }>();
+    const recent = dashboard.recent.find(({ media }) => media.id === 'ep-1');
+    expect(recent?.show?.id).toBe('show-1');
+    expect(recent).toHaveProperty('seasonPosterPath');
+  });
+
   it('opens a long-running show without exceeding D1 query limits', async () => {
     await request('/api/health');
     await seedMedia(harness.database, {

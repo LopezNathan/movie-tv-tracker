@@ -1,10 +1,15 @@
 import { Search, X } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
-import { keepPreviousData, useInfiniteQuery } from '@tanstack/react-query';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query';
 import { Link } from 'react-router-dom';
 import { EmptyState, ErrorState, LoadingState } from '../components/async-state';
 import { MediaCard } from '../components/media-card';
-import { queries, type WatchedLibraryCursor } from '../lib/api';
+import { api, queries, type WatchedLibraryCursor } from '../lib/api';
 
 type LibraryFilter = 'all' | 'movie' | 'show' | 'episode' | 'hidden';
 
@@ -17,6 +22,7 @@ const filters: Array<{ value: LibraryFilter; label: string }> = [
 ];
 
 export function LibraryPage() {
+  const client = useQueryClient();
   const [filter, setFilter] = useState<LibraryFilter>('all');
   const [search, setSearch] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -36,6 +42,11 @@ export function LibraryPage() {
     initialPageParam: null as WatchedLibraryCursor | null,
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     placeholderData: keepPreviousData,
+  });
+
+  const clearHistory = useMutation({
+    mutationFn: (mediaId: string) => api(`/api/watch-history/${mediaId}`, { method: 'DELETE' }),
+    onSuccess: () => client.invalidateQueries(),
   });
 
   const items = useMemo(() => {
@@ -113,10 +124,25 @@ export function LibraryPage() {
           {items.length ? (
             <>
               <div className="poster-grid">
-                {items.map(({ item, watchedAt, hiddenAt }) => (
+                {items.map(({ item, show, watchedAt, hiddenAt }) => (
                   <MediaCard
                     key={item.id}
                     item={item}
+                    to={item.kind === 'episode' && show ? `/media/show/${show.tmdbId}` : undefined}
+                    {...(filter !== 'hidden' && {
+                      removeLabel: 'Remove from watch history',
+                      removeDisabled: clearHistory.isPending,
+                      onRemove: () => {
+                        const scope = item.kind === 'show' ? ' and all its episodes' : '';
+                        if (
+                          window.confirm(
+                            `Delete the watch history for “${item.title}”${scope}? This can't be undone.`,
+                          )
+                        ) {
+                          clearHistory.mutate(item.id);
+                        }
+                      },
+                    })}
                     note={
                       hiddenAt
                         ? `Hidden ${new Intl.DateTimeFormat(undefined, {

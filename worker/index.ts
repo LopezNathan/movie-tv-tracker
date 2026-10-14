@@ -458,11 +458,33 @@ app.get('/api/dashboard', async (c) => {
     );
   const showsById = new Map(showRows.map((show) => [show.id, show as MediaRecord]));
 
+  const recentSeasons = new Map<string, { show: MediaRecord; seasonNumber: number }>();
+  for (const row of recentRows) {
+    const show = row.item.seriesId ? showsById.get(row.item.seriesId) : undefined;
+    if (show && row.item.seasonNumber !== null) {
+      recentSeasons.set(`${show.id}:${row.item.seasonNumber}`, {
+        show,
+        seasonNumber: row.item.seasonNumber,
+      });
+    }
+  }
+  const seasonPosters = new Map(
+    await Promise.all(
+      [...recentSeasons.entries()].map(async ([key, { show, seasonNumber }]) => {
+        return [key, await getSeasonPoster(c.env, show, seasonNumber)] as const;
+      }),
+    ),
+  );
+
   const payload: DashboardResponse = {
     upNext,
     recent: recentRows.map((row) => ({
       ...eventRecord(row),
       show: row.item.seriesId ? showsById.get(row.item.seriesId) : undefined,
+      seasonPosterPath:
+        row.item.seriesId && row.item.seasonNumber !== null
+          ? (seasonPosters.get(`${row.item.seriesId}:${row.item.seasonNumber}`) ?? null)
+          : undefined,
     })),
     watchlist: watchlistRows.map((row) => row.item as MediaRecord),
     stats: {
@@ -841,6 +863,7 @@ app.get(
           return {
             ...row,
             item: { ...row.item, posterPath: seasonPoster ?? show?.posterPath ?? null },
+            show,
           };
         }),
         total: matchingItems.length,
@@ -935,6 +958,7 @@ app.get(
         return {
           ...row,
           item: { ...row.item, posterPath: seasonPoster ?? show?.posterPath ?? null },
+          show,
         };
       }),
       total: totals[0]?.total ?? 0,
@@ -988,6 +1012,31 @@ app.delete('/api/watch-events/:id', async (c) => {
     .returning({ id: watchEvents.id });
   if (!deleted.length) throw new HTTPException(404, { message: 'Watch event not found.' });
   return c.body(null, 204);
+});
+
+// Clears a title from the watched library. A show's library entry is derived
+// from its episodes' events, so removing a show removes those too.
+app.delete('/api/watch-history/:mediaId', zValidator('param', mediaIdParam), async (c) => {
+  const db = drizzle(c.env.DB);
+  const user = c.get('user');
+  const { mediaId } = c.req.valid('param');
+  const deleted = await db
+    .delete(watchEvents)
+    .where(
+      and(
+        eq(watchEvents.userId, user.id),
+        or(
+          eq(watchEvents.mediaId, mediaId),
+          inArray(
+            watchEvents.mediaId,
+            db.select({ id: media.id }).from(media).where(eq(media.seriesId, mediaId)),
+          ),
+        ),
+      ),
+    )
+    .returning({ id: watchEvents.id });
+  if (!deleted.length) throw new HTTPException(404, { message: 'No watch history found.' });
+  return c.json({ deleted: deleted.length });
 });
 
 app.put(
