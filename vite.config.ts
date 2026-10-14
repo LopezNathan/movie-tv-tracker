@@ -55,11 +55,12 @@ export default defineConfig({
               request.method === 'GET' &&
               url.origin === self.location.origin &&
               /^\/api\/(dashboard|history|library|media\/)/.test(url.pathname),
-            handler: 'StaleWhileRevalidate',
+            handler: 'NetworkFirst',
             options: {
-              // Read pages should open from the last successful response,
-              // even when TMDB or the origin is temporarily unavailable. A
-              // successful network response still refreshes this cache.
+              // Prefer fresh data so reopening the PWA never shows a stale
+              // response, but fall back to the last successful response when
+              // offline or when TMDB/the origin is slow or unavailable.
+              networkTimeoutSeconds: 4,
               cacheName: 'scene-read-api-v1',
               cacheableResponse: { statuses: [0, 200] },
               expiration: { maxEntries: 80, maxAgeSeconds: 7 * 24 * 60 * 60 },
