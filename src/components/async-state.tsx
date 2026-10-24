@@ -32,26 +32,30 @@ export function ErrorState({ error, retry }: { error: unknown; retry?: () => voi
   return (
     <div className="async-state error" role="alert">
       <AlertTriangle aria-hidden="true" />
-      <div>
+      <div className="async-state-message">
         <strong>Something went off script.</strong>
         <p>{error instanceof Error ? error.message : 'The request could not be completed.'}</p>
         {needsAccessRenewal && (
-          <p>Your Cloudflare Access session may have expired. Sign in again to continue.</p>
+          <p>Your Cloudflare Access sign-in may have expired. Sign in again to continue.</p>
         )}
       </div>
-      {retry && (
-        <button className="button subtle" onClick={retry}>
-          Try again
-        </button>
-      )}
-      {needsAccessRenewal && (
-        <button
-          className="button subtle"
-          onClick={() => void renewAccessSession()}
-          disabled={restartingAccess}
-        >
-          {restartingAccess ? 'Opening sign-in…' : 'Sign in again'}
-        </button>
+      {(retry || needsAccessRenewal) && (
+        <div className="async-state-actions">
+          {retry && (
+            <button className="button subtle" onClick={retry}>
+              Try again
+            </button>
+          )}
+          {needsAccessRenewal && (
+            <button
+              className="button subtle"
+              onClick={() => void renewAccessSession()}
+              disabled={restartingAccess}
+            >
+              {restartingAccess ? 'Opening sign-in…' : 'Sign in again'}
+            </button>
+          )}
+        </div>
       )}
     </div>
   );

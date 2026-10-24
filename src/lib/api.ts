@@ -79,7 +79,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const isOnline = navigator.onLine;
     throw new ApiRequestError(
       isOnline
-        ? 'The request could not reach the server. Your session may have expired.'
+        ? 'The request could not reach the server.'
         : method === 'GET'
           ? 'This page is not available offline yet.'
           : 'The request was interrupted. Check your connection and try again.',
@@ -103,10 +103,7 @@ export async function api<T>(path: string, init?: RequestInit): Promise<T> {
   try {
     return JSON.parse(text) as T;
   } catch {
-    throw new ApiRequestError(
-      'The API returned an unexpected page. Your session may have expired.',
-      0,
-    );
+    throw new ApiRequestError('The API returned an unexpected page.', 0);
   }
 }
 
