@@ -236,6 +236,9 @@ button {
 
 .page-stack {
   display: grid;
+  /* A single shrinkable track, so wide content (toolbars, scrolling filter rows)
+     can't stretch the page past the viewport on narrow screens. */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   max-width: 820px;
   gap: 1.25rem;
